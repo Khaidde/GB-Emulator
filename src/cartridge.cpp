@@ -2,7 +2,7 @@
 
 #include <fstream>
 
-Cartridge::Cartridge(const char* romPath) {
+void Cartridge::load_from_path(const char* romPath) {
     std::ifstream file(romPath, std::ios::binary);
     if (!file.is_open()) return;
 

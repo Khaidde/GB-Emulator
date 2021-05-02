@@ -2,7 +2,6 @@
 
 #include <cstdio>
 #include <chrono>
-#include <chrono>
 
 static void create_screen(Screen& screen, int width, int height, const char* title) {
     screen.window =
@@ -21,11 +20,17 @@ static void create_screen(Screen& screen, int width, int height, const char* tit
     screen.pitch = 0;
 }
 
-GameBoy::GameBoy(const char* romPath) : memory(), cpu(&memory), ppu(&memory), cartridge(romPath) {
-    memory.startup();
-    cpu.startup();
-    memory.load_cartridge(&cartridge);
-    keyState = 0xFF;
+GameBoy::GameBoy(const char* romPath) {
+    debugger.init(&cpu, &memory);
+
+    cpu.init(&memory, &debugger);
+    memory.init(&debugger);
+
+    cartridge.load_from_path(romPath);
+    ppu.init(&memory);
+    input.init(&memory);
+    timer.init(&memory);
+    memory.load_peripherals(&cartridge, &input, &timer);
 
     create_screen(screen, GameBoy::WIDTH * Screen::PIXEL_SCALE, GameBoy::HEIGHT * Screen::PIXEL_SCALE, GameBoy::TITLE);
 }
@@ -34,67 +39,54 @@ static void destroy_screen(Screen& screen) {
     SDL_DestroyTexture(screen.bufferTexture);
     SDL_DestroyRenderer(screen.renderer);
     SDL_DestroyWindow(screen.window);
-};
+}
 
 GameBoy::~GameBoy() { destroy_screen(screen); }
 
 void GameBoy::begin() {
     using namespace std::chrono_literals;
 
-    std::chrono::high_resolution_clock timer;
+    std::chrono::high_resolution_clock sysTimer;
     std::chrono::nanoseconds delta(0ns);
-    auto last = timer.now();
+    auto last = sysTimer.now();
     static constexpr std::chrono::nanoseconds FRAME_MS(16742000ns);  // Roughly 60fps
 
     SDL_Event e;
     bool running = true;
 
-    int mcycleCount = 0;
-    int other = 0;
+    int totalMCycles = 0;
 
-    bool space = false;
-    bool stepped = false;
     while (running) {
         while (SDL_PollEvent(&e)) {
             switch (e.type) {
                 case SDL_QUIT:
                     running = false;
                     break;
-                case SDL_KEYDOWN:
                 case SDL_KEYUP:
-                    handle_input(e);
-                    if (e.key.keysym.sym == SDLK_SPACE) {
-                        if (e.type == SDL_KEYDOWN) {
-                            if (!space) {
-                                space = true;
-                                stepped = false;
-                            }
-                        } else {
-                            space = false;
-                        }
-                    }
-                    break;
+                    debugger.handle_function_key(e);
+                case SDL_KEYDOWN:
+                    input.handle_input(e);
             }
+            break;
         }
 
-        // TODO handle time accurate clock cycles
-        while (mcycleCount < PPU::TOTAL_CYCLES) {
-            if (!cpu.stepMode) stepped = false;
-            if (stepped) break;
-            stepped = true;
+        while (totalMCycles < (int)PPU::TOTAL_CLOCKS / 4) {
+            if (debugger.is_paused() && !debugger.step()) break;
 
-            u8 deltaCycles = 0;
-            cpu.tick(deltaCycles);
-            ppu.proccess(deltaCycles);
-            mcycleCount += deltaCycles;
+            u8 mCycles = cpu.tick();
+            timer.tick(mCycles);
+            for (int i = 0; i < mCycles * 4; i++) {
+                ppu.emulate_clock();
+            }
+            totalMCycles += mCycles;
         }
         render_screen();
 
-        auto now = timer.now();
+        auto now = sysTimer.now();
         delta += std::chrono::duration_cast<std::chrono::nanoseconds>(now - last);
         last = now;
         while (delta >= FRAME_MS) {
-            mcycleCount = 0;
+            totalMCycles = 0;
             delta -= FRAME_MS;
         }
     }
@@ -116,59 +108,4 @@ void GameBoy::render_screen() {
 
     SDL_RenderCopy(screen.renderer, screen.bufferTexture, NULL, NULL);
     SDL_RenderPresent(screen.renderer);
-}
-
-void GameBoy::handle_input(SDL_Event keyEvent) {
-    if (keyEvent.type != SDL_KEYDOWN && keyEvent.type != SDL_KEYUP) return;
-
-    u8 key;
-    switch (keyEvent.key.keysym.sym) {
-        case SDLK_RETURN:  // START
-            key = 7;
-            break;
-        case SDLK_SPACE:  // SELECT
-            key = 6;
-            break;
-        case SDLK_j:  // B
-            key = 5;
-            break;
-        case SDLK_k:  // A
-            key = 4;
-            break;
-
-        case SDLK_s:  // DOWN
-            key = 3;
-            break;
-        case SDLK_w:  // UP
-            key = 2;
-            break;
-        case SDLK_a:  // LEFT
-            key = 1;
-            break;
-        case SDLK_d:  // RIGHT
-            key = 0;
-            break;
-        default:
-            return;
-    }
-
-    u8 keyBit = 1 << key;
-    bool isPress = keyEvent.type == SDL_KEYDOWN;
-    if (!(~keyState & keyBit) && isPress) {
-        memory.request_interrupt(Memory::JOYPAD_INT);
-    }
-    keyState = (keyState | keyBit) & ~(keyBit * isPress);
-}
-
-u8 GameBoy::get_key_state() {
-    u8 joypadReg = memory.read(Memory::JOYP_REG);
-
-    static constexpr u8 BTN_SELECT = (1 << 5);
-    static constexpr u8 DIR_SELECT = (1 << 4);
-    if (~joypadReg & BTN_SELECT) {
-        joypadReg = (joypadReg & 0xF0) | (keyState >> 4);
-    } else if (~joypadReg & DIR_SELECT) {
-        joypadReg = (joypadReg & 0xF0) | (keyState & 0xF);
-    }
-    return joypadReg;
 }

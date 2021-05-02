@@ -39,12 +39,62 @@ int main(int argc, char** argv) {
 }
 */
 using u8 = uint8_t;
+using s8 = int8_t;
+
+// void doStuff(u8& thing) { thing = 3; }
+
+static const u8 len = 10;
+static u8 arrayTest[len];
+
+u8& ref(u8 addr) { return arrayTest[addr]; }
+
+struct FIFO {
+    static constexpr u8 FIFO_SIZE = 16;
+    u8 headPtr = 0;
+    u8 tailPtr = 0;
+    u8 size = 0;
+    u8 fifo[FIFO_SIZE];
+
+    void push_pixel(u8 pixel) {
+        fifo[headPtr] = pixel;
+        headPtr = (headPtr + 1) % FIFO_SIZE;
+        size++;
+    }
+    u8 pop_pixel() {
+        u8 pixel = fifo[tailPtr];
+        tailPtr = (tailPtr + 1) % FIFO_SIZE;
+        size--;
+        return pixel;
+    }
+    void flush() {
+        headPtr = 0;
+        tailPtr = 0;
+        size = 0;
+    }
+};
 
 int main(int argc, char** argv) {
-    bool c = true;
-    u8 reg = 0xEF;
-    u8 res = (reg << 1) | c;
-    printf("%d", res);
+    FIFO testFifo;
+    for (int i = 0; i < 12; i++) {
+        testFifo.push_pixel(i * 2);
+    }
+    for (int i = 0; i < 8; i++) {
+        printf("%d\n", testFifo.pop_pixel());
+    }
+    for (int i = 0; i < 12; i++) {
+        testFifo.push_pixel(i * 10);
+    }
+    printf("size=%d\n", testFifo.size);
+    testFifo.flush();
+
+    for (int i = 0; i < 12; i++) {
+        testFifo.push_pixel(i * 10);
+    }
+
+    for (int i = 0; i < 8; i++) {
+        printf("%d\n", testFifo.pop_pixel());
+    }
+    printf("size=%d\n", testFifo.size);
 
     /*
         set_flag(Z_FLAG, reg == 0);

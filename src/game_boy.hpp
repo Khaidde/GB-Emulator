@@ -4,8 +4,11 @@
 
 #include "cartridge.hpp"
 #include "cpu.hpp"
+#include "debugger.hpp"
+#include "input.hpp"
 #include "memory.hpp"
 #include "ppu.hpp"
+#include "timer.hpp"
 
 struct Screen {
     static constexpr int PIXEL_SCALE = 4;
@@ -31,15 +34,15 @@ class GameBoy {
 
     void render_screen();
 
-    void handle_input(SDL_Event keyEvent);
-    u8 get_key_state();
-
    private:
-    CPU cpu;
-    Cartridge cartridge;
-    Memory memory;
-    PPU ppu;
+    Debugger debugger;
 
+    CPU cpu;
+    Memory memory;
+
+    Cartridge cartridge;
+    Input input;
+    Timer timer;
+    PPU ppu;
     Screen screen;
-    u8 keyState;
 };

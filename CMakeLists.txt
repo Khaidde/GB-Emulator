@@ -6,10 +6,10 @@ project(
     VERSION 1.0
     LANGUAGES CXX)
 
-set(CMAKE_PREFIX_PATH
-    ${CMAKE_PREFIX_PATH}
-    C:/CDev/SDL2_MinGW_32Bit
-)
+set(GCC_FLAGS -Wall)
+set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} ${GCC_FLAGS})
+
+set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} C:/CDev/SDL2_MinGW_32Bit)
 
 find_package(SDL2 REQUIRED)
 
@@ -18,10 +18,13 @@ include_directories(${PROJECT_SOURCE_DIR}/src)
 set(SOURCES
     src/cartridge.cpp
     src/cpu.cpp
+    src/debugger.cpp
     src/game_boy.cpp
+    src/input.cpp
     src/main.cpp
     src/memory.cpp
     src/ppu.cpp
+    src/timer.cpp
 )
 add_executable(gbemu ${SOURCES})
 
