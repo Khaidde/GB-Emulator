@@ -420,13 +420,11 @@ u8 CPU::tick() {
     branch = false;
 
     handle_interrupts();  // Interrupts are checked before fetching a new instruction
-    // u8 interCycles = cycles;
 
     if (halted) return 1;
 
-    if (PC == 0xC66F) {
-        // debugger->pause_exec();
-    }
+    // if (PC == 0) {
+    // }
 
     debugger->update_instr(PC);
     u8 op = n();
@@ -438,15 +436,6 @@ u8 CPU::tick() {
     (this->*opcodes[op])();
 
     if (debugger->is_paused()) debugger->print_instr();
-    /*
-    if (op != 0xCB) {
-        u8* cycleList = branch ? test_branch_cycles : test_cycles;
-        if (cycles - interCycles != cycleList[op]) {
-            printf("%d != expected %d cycles (%02x)\n", cycles - interCycles, cycleList[op], op);
-            debugger->pause_exec();
-        }
-    }
-    */
 
     return cycles;
 }
@@ -476,8 +465,8 @@ void CPU::set_flag(u8 flag, bool set) { AF.lo = (AF.lo & ~flag) | (flag * set); 
 bool CPU::check_flag(u8 flag) { return (AF.lo & flag) != 0; }
 
 // ----- Intructions -----
-void CPU::op00() {}  // NOP
-void CPU::op10() {}  // STOP
+void CPU::op00() {}                       // NOP
+void CPU::op10() { printf("stop!!\n"); }  // STOP
 void CPU::op76() {
     u8 interrupts = memory->read(Memory::IF_REG) & memory->read(Memory::IE_REG) & 0x1F;
     halted = ime || !interrupts;

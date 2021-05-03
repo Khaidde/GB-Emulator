@@ -85,7 +85,7 @@ void GameBoy::begin() {
         auto now = sysTimer.now();
         delta += std::chrono::duration_cast<std::chrono::nanoseconds>(now - last);
         last = now;
-        while (delta >= FRAME_MS) {
+        if (delta >= FRAME_MS) {
             totalMCycles = 0;
             delta -= FRAME_MS;
         }

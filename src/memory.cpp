@@ -43,16 +43,9 @@ void Memory::load_peripherals(Cartridge* cartridge, Input* input, Timer* timer) 
 void Memory::request_interrupt(Interrupt interrupt) { write(IF_REG, read(IF_REG) | (u8)interrupt); }
 
 u8 Memory::read(u16 address) {
-    /*
-    if (address >= 0x104 && address < 0x8000) {
-        static const uint8_t NINTENDO_LOGO[16 * 3] = {
-            0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B, 0x03, 0x73, 0x00, 0x83, 0x00, 0x0C, 0x00, 0x0D,
-            0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E, 0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99,
-            0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC, 0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E,
-        };
-        // return NINTENDO_LOGO[address - 0x104];
+    if (0xFEA0 <= address && address < 0xFF00) {
+        return 0;
     }
-    */
     switch (address) {
         case JOYP_REG: {
             bool btnSelect = ~mem[address] & (1 << 5);
@@ -67,33 +60,50 @@ u8 Memory::read(u16 address) {
 }
 
 void Memory::write(u16 address, u8 val) {
+    if (address < 0x8000) {
+        // TODO deal with cartridges and switching
+        return;
+    }
+    if (0xC000 <= address && address < 0xDE00) {
+        mem[address] = val;
+        mem[address + 0x2000] = val;
+        return;
+    }
     switch (address) {
         case JOYP_REG:
             mem[address] = 0xC0 | (val & 0x30) | (mem[address] & 0x0F);
-            break;
-        case SC_REG:
-            if (val == 0x81) printf("%c", read(SB_REG));
-            break;
+            return;
         case DIV_REG:
             timer->reset_div();
-            break;
+            return;
         case TAC_REG:
             timer->set_enable((val >> 2) & 0x1);
             timer->set_frequency(val & 0x3);
             mem[address] = 0xF8 | (val & 0x7);
+            return;
+        case LCDC_REG:
+            if ((val & (1 << 7)) == 0) mem[LY_REG] = 0;
+            break;
+        case STAT_REG:
+            if (val != 0) {
+                printf("TODO stat interrupts not implemented yet! stat=%02x", val);
+            }
             break;
         case DMA_REG: {
+            if (0xFE <= val && val <= 0xFF) {
+                printf("TODO illegal DMA source value");
+                val = mem[address];
+            }
             u16 start = val << 8;
             for (int i = 0; i < 0xA0; i++) {
-                mem[0xFE00 + i] = mem[start + i];
+                mem[0xFE00 + i] = read(start + i);
             }
         } break;
         case IF_REG:
             mem[address] = 0xE0 | (val & 0x1F);
-            break;
-        default:
-            mem[address] = val;
+            return;
     }
+    mem[address] = val;
 }
 
 void Memory::inc(u16 address) { mem[address]++; }
