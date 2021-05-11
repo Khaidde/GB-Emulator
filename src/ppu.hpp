@@ -1,6 +1,5 @@
 #pragma once
 
-#include "memory.hpp"
 #include "utils.hpp"
 
 class Memory;
@@ -47,6 +46,7 @@ class PPU {
 
    private:
     Memory* memory;
+
     u8* lcdc;
     u8* stat;
     u8* scy;

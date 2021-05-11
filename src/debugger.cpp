@@ -28,29 +28,29 @@ void Debugger::print_instr() {
            cpu->check_flag(CPU::H_FLAG), cpu->check_flag(CPU::C_FLAG));
     printf("\tAF=%04x BC=%04x DE=%04x HL=%04x\n", cpu->AF.pair, cpu->BC.pair, cpu->DE.pair, cpu->HL.pair);
     printf("\tSP=%04x PC=%04x\n", cpu->SP, cpu->PC);
-    printf("\time=%d if=%02x ie=%02x\n", cpu->ime, memory->read(Memory::IF_REG), memory->read(Memory::IE_REG));
-    printf("\tly=%02x lcdc=%02x stat=%02x\n", memory->read(Memory::LY_REG), memory->read(Memory::LCDC_REG),
-           memory->read(Memory::STAT_REG));
+    printf("\time=%d if=%02x ie=%02x\n", cpu->ime, memory->read(IOReg::IF_REG), memory->read(IOReg::IE_REG));
+    printf("\tly=%02x lcdc=%02x stat=%02x\n", memory->read(IOReg::LY_REG), memory->read(IOReg::LCDC_REG),
+           memory->read(IOReg::STAT_REG));
 
-    // print_reg(Memory::JOYP_REG, "Joypad");
+    // print_reg(IOReg::JOYP_REG, "Joypad");
 
-    // print_reg(Memory::SB_REG, "Serial Transfer Data");
-    // print_reg(Memory::SC_REG, "Serial Transfer Control");
+    // print_reg(IOReg::SB_REG, "Serial Transfer Data");
+    // print_reg(IOReg::SC_REG, "Serial Transfer Control");
 
-    print_reg(Memory::DIV_REG, "Divide");
-    print_reg(Memory::TIMA_REG, "Timer Counter");
-    print_reg(Memory::TMA_REG, "Timer Modulo");
-    print_reg(Memory::TAC_REG, "Timer Control");
+    print_reg(IOReg::DIV_REG, "Divide");
+    print_reg(IOReg::TIMA_REG, "Timer Counter");
+    print_reg(IOReg::TMA_REG, "Timer Modulo");
+    print_reg(IOReg::TAC_REG, "Timer Control");
 
-    print_reg(Memory::LYC_REG, "lyc");
+    print_reg(IOReg::LYC_REG, "lyc");
     /*
-    print_reg(Memory::SCY_REG, "Y-Scoll");
-    print_reg(Memory::SCX_REG, "X-Scoll");
-    print_reg(Memory::BGP_REG, "Background Palette");
-    print_reg(Memory::OBP0_REG, "Object Palette 0");
-    print_reg(Memory::OBP1_REG, "Object Palette 1");
-    print_reg(Memory::WY_REG, "Window Y");
-    print_reg(Memory::WX_REG, "Window X");
+    print_reg(IOReg::SCY_REG, "Y-Scoll");
+    print_reg(IOReg::SCX_REG, "X-Scoll");
+    print_reg(IOReg::BGP_REG, "Background Palette");
+    print_reg(IOReg::OBP0_REG, "Object Palette 0");
+    print_reg(IOReg::OBP1_REG, "Object Palette 1");
+    print_reg(IOReg::WY_REG, "Window Y");
+    print_reg(IOReg::WX_REG, "Window X");
     */
 }
 

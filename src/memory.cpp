@@ -5,9 +5,38 @@
 #include <string.h>
 #include <vector>
 
-void Memory::init(Debugger* debugger) {
-    this->debugger = debugger;
-    restart();
+Memory::Memory() { restart(); }
+
+void Memory::restart() {
+    mem[IOReg::TIMA_REG] = 0x00;
+    mem[IOReg::TMA_REG] = 0x00;
+    mem[IOReg::TAC_REG] = 0xF8;
+
+    mem[IOReg::LCDC_REG] = 0x91;
+    mem[IOReg::STAT_REG] = 0x82;  // ppu mode should be 2 (oam scan)
+    mem[IOReg::SCY_REG] = 0x00;
+    mem[IOReg::SCX_REG] = 0x00;
+    mem[IOReg::LYC_REG] = 0x00;
+    mem[IOReg::BGP_REG] = 0xFC;
+    mem[IOReg::OBP0_REG] = 0xFF;
+    mem[IOReg::OBP1_REG] = 0xFF;
+
+    mem[IOReg::WY_REG] = 0x00;
+    mem[IOReg::WX_REG] = 0x00;
+
+    mem[IOReg::IF_REG] = 0xE0;
+    mem[IOReg::IE_REG] = 0x00;
+}
+
+void Memory::set_debugger(Debugger* debugger) { this->debugger = debugger; }
+
+void Memory::set_peripherals(Input* input, Timer* timer, PPU* ppu) {
+    this->input = input;
+    this->timer = timer;
+    this->ppu = ppu;
+
+    timer->init(this);
+    ppu->init(this);
 }
 
 void Memory::load_cartridge(const char* romPath) {
@@ -114,104 +143,77 @@ void Memory::load_cartridge(const char* romPath) {
     printf("Checksum: %s\n", (x & 0xF) == rom[0x014D] ? "PASSED" : "FAILED");
 }
 
-void Memory::restart() {
-    mem[TIMA_REG] = 0x00;
-    mem[TMA_REG] = 0x00;
-    mem[TAC_REG] = 0xF8;
+u8& Memory::ref(u16 addr) { return mem[addr]; }
 
-    mem[LCDC_REG] = 0x91;
-    mem[STAT_REG] = 0x82;  // ppu mode should be 2 (oam scan)
-    mem[SCY_REG] = 0x00;
-    mem[SCX_REG] = 0x00;
-    mem[LYC_REG] = 0x00;
-    mem[BGP_REG] = 0xFC;
-    mem[OBP0_REG] = 0xFF;
-    mem[OBP1_REG] = 0xFF;
-
-    mem[WY_REG] = 0x00;
-    mem[WX_REG] = 0x00;
-
-    mem[IF_REG] = 0xE0;
-    mem[IE_REG] = 0x00;
-}
-
-void Memory::load_peripherals(Input* input, Timer* timer, PPU* ppu) {
-    this->input = input;
-    this->timer = timer;
-    this->ppu = ppu;
-}
-
-void Memory::request_interrupt(Interrupt interrupt) { write(IF_REG, read(IF_REG) | (u8)interrupt); }
-
-u8& Memory::ref(u16 address) { return mem[address]; }
-
-u8 Memory::read(u16 address) {
-    if (address < 0x8000 || (0xA000 <= address && address < 0xC000)) {
-        return cartridge->read(address);
+u8 Memory::read(u16 addr) {
+    if (addr < 0x8000 || (0xA000 <= addr && addr < 0xC000)) {
+        return cartridge->read(addr);
     }
-    if (0xFEA0 <= address && address < 0xFF00) return 0;
-    switch (address) {
-        case JOYP_REG: {
-            bool btnSelect = ~mem[address] & (1 << 5);
-            bool dirSelect = ~mem[address] & (1 << 4);
-            mem[address] = input->get_key_state(btnSelect, dirSelect);
+    if (0xFEA0 <= addr && addr < 0xFF00) return 0;
+    switch (addr) {
+        case IOReg::JOYP_REG: {
+            bool btnSelect = ~mem[addr] & (1 << 5);
+            bool dirSelect = ~mem[addr] & (1 << 4);
+            mem[addr] = input->get_key_state(btnSelect, dirSelect);
             break;
         }
-        case LY_REG:
+        case IOReg::LY_REG:
             return ppu->read_ly();
         default:
             break;
     }
-    return mem[address];
+    return mem[addr];
 }
 
-void Memory::write(u16 address, u8 val) {
-    if (address < 0x8000 || (0xA000 <= address && address < 0xC000)) {
-        cartridge->write(address, val);
+void Memory::write(u16 addr, u8 val) {
+    if (addr < 0x8000 || (0xA000 <= addr && addr < 0xC000)) {
+        cartridge->write(addr, val);
         return;
     }
-    if (0xC000 <= address && address < 0xDE00) {
-        mem[address] = val;
-        mem[address + 0x2000] = val;
+    if (0xC000 <= addr && addr < 0xDE00) {
+        mem[addr] = val;
+        mem[addr + 0x2000] = val;
         return;
     }
-    switch (address) {
-        case JOYP_REG:
-            mem[address] = 0xC0 | (val & 0x30) | (mem[address] & 0x0F);
+    switch (addr) {
+        case IOReg::JOYP_REG:
+            mem[addr] = 0xC0 | (val & 0x30) | (mem[addr] & 0x0F);
             return;
-        case SC_REG:
-            mem[address] = (val & (1 << 8)) | 0x7E | (val & 1);
+        case IOReg::SC_REG:
+            mem[addr] = (val & (1 << 8)) | 0x7E | (val & 1);
             return;
-        case DIV_REG:
+        case IOReg::DIV_REG:
             timer->reset_div();
             return;
-        case TAC_REG:
+        case IOReg::TAC_REG:
             timer->set_enable((val >> 2) & 0x1);
             timer->set_frequency(val & 0x3);
-            mem[address] = 0xF8 | (val & 0x7);
+            mem[addr] = 0xF8 | (val & 0x7);
             return;
-        case LCDC_REG:
-            if ((val & (1 << 7)) == 0) mem[LY_REG] = 0;
+        case IOReg::LCDC_REG:
+            if ((val & (1 << 7)) == 0) mem[IOReg::LY_REG] = 0;
             break;
-        case STAT_REG:
-            mem[address] = 0x80 | (val & 0x78) | (mem[address] & 0x7);
+        case IOReg::STAT_REG:
+            mem[addr] = 0x80 | (val & 0x78) | (mem[addr] & 0x7);
             return;
-        case LYC_REG:
+        case IOReg::LYC_REG:
             ppu->update_coincidence(val);
             break;
-        case DMA_REG: {
+        case IOReg::DMA_REG: {
             if (0xFE <= val && val <= 0xFF) {
                 printf("TODO illegal DMA source value\n");
-                val = mem[address];
+                val = mem[addr];
             }
             u16 start = val << 8;
             for (int i = 0; i < 0xA0; i++) {
                 mem[0xFE00 + i] = read(start + i);
             }
         } break;
-        case IF_REG:
-            mem[address] = 0xE0 | (val & 0x1F);
+        case IOReg::IF_REG:
+            mem[addr] = 0xE0 | (val & 0x1F);
             return;
     }
-    mem[address] = val;
+    mem[addr] = val;
 }
+
+void Memory::request_interrupt(Interrupt interrupt) { write(IOReg::IF_REG, read(IOReg::IF_REG) | (u8)interrupt); }

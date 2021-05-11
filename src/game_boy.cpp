@@ -3,7 +3,9 @@
 #include <cstdio>
 #include <chrono>
 
-static void create_screen(Screen& screen, int width, int height, const char* title) {
+namespace {
+
+void create_screen(Screen& screen, int width, int height, const char* title) {
     screen.window =
         SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_SHOWN);
 
@@ -20,26 +22,27 @@ static void create_screen(Screen& screen, int width, int height, const char* tit
     screen.pitch = 0;
 }
 
+void destroy_screen(Screen& screen) {
+    SDL_DestroyTexture(screen.bufferTexture);
+    SDL_DestroyRenderer(screen.renderer);
+    SDL_DestroyWindow(screen.window);
+}
+
+}  // namespace
+
 GameBoy::GameBoy(const char* romPath) {
     debugger.init(&cpu, &memory);
 
     cpu.init(&memory, &debugger);
-    memory.init(&debugger);
 
-    memory.load_cartridge(romPath);
-
-    input.init(&memory);
     timer.init(&memory);
     ppu.init(&memory);
-    memory.load_peripherals(&input, &timer, &ppu);
+
+    memory.set_debugger(&debugger);
+    memory.load_cartridge(romPath);
+    memory.set_peripherals(&input, &timer, &ppu);
 
     create_screen(screen, GameBoy::WIDTH * Screen::PIXEL_SCALE, GameBoy::HEIGHT * Screen::PIXEL_SCALE, GameBoy::TITLE);
-}
-
-static void destroy_screen(Screen& screen) {
-    SDL_DestroyTexture(screen.bufferTexture);
-    SDL_DestroyRenderer(screen.renderer);
-    SDL_DestroyWindow(screen.window);
 }
 
 GameBoy::~GameBoy() { destroy_screen(screen); }
@@ -65,8 +68,11 @@ void GameBoy::begin() {
                     break;
                 case SDL_KEYUP:
                     debugger.handle_function_key(e);
+                    input.handle_input(false, get_gb_key(e.key.keysym.sym));
+                    break;
                 case SDL_KEYDOWN:
-                    input.handle_input(e);
+                    input.handle_input(true, get_gb_key(e.key.keysym.sym));
+                    break;
             }
             break;
         }
@@ -74,7 +80,7 @@ void GameBoy::begin() {
         while (totalMCycles < (int)PPU::TOTAL_CLOCKS / 4) {
             if (cpu.isFetching() && debugger.is_paused() && !debugger.step()) break;
 
-            for (int c = 0; c < 4; c++) {
+            for (int i = 0; i < 4; i++) {
                 timer.emulate_clock();
                 ppu.emulate_clock();
             }
@@ -93,13 +99,37 @@ void GameBoy::begin() {
     }
 }
 
+char GameBoy::get_gb_key(SDL_Keycode keycode) {
+    switch (keycode) {
+        case SDLK_n:  // START
+            return 7;
+        case SDLK_b:  // SELECT
+            return 6;
+        case SDLK_j:  // B
+            return 5;
+        case SDLK_k:  // A
+            return 4;
+
+        case SDLK_s:  // DOWN
+            return 3;
+        case SDLK_w:  // UP
+            return 2;
+        case SDLK_a:  // LEFT
+            return 1;
+        case SDLK_d:  // RIGHT
+            return 0;
+
+        default:
+            return -1;
+    }
+}
+
 void GameBoy::render_screen() {
     SDL_RenderClear(screen.renderer);
 
     u32* pixelBuffer;
     if (SDL_LockTexture(screen.bufferTexture, nullptr, (void**)&pixelBuffer, &screen.pitch)) {
-        fprintf(stderr, "Failed to lock texture! SDL_error: %s\n", SDL_GetError());
-        return;
+        fatal("Failed to lock texture! SDL_error: %s\n", SDL_GetError());
     }
     screen.pitch /= sizeof(u32);
 

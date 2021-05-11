@@ -28,20 +28,19 @@ class GameBoy {
 
     GameBoy(const char*);
     ~GameBoy();
-
-   public:
     void begin();
+    char get_gb_key(SDL_Keycode keycode);
 
     void render_screen();
 
    private:
-    Debugger debugger;
+    Screen screen;
 
-    CPU cpu;
-    Memory memory;
+    Debugger debugger;
 
     Input input;
     Timer timer;
     PPU ppu;
-    Screen screen;
+    Memory memory;
+    CPU cpu;
 };

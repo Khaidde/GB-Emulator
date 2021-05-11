@@ -7,18 +7,22 @@
 class Memory;
 class Debugger;
 
+union RegPair {
+    struct {
+        u8 lo;
+        u8 hi;
+    };
+    u16 pair;
+};
+
 class CPU {
    public:
     void init(Memory* memory, Debugger* debugger);
     void restart();
 
-    u8 curCycle;
-    u8 targetCycles;
-    bool doPreciseTiming;
     void handle_interrupts();
-    void emulate_cycle();
-
     bool isFetching();
+    void emulate_cycle();
 
    private:
     friend class Debugger;
@@ -26,13 +30,6 @@ class CPU {
 
     Memory* memory;
 
-    union RegPair {
-        struct {
-            u8 lo;
-            u8 hi;
-        };
-        u16 pair;
-    };
     RegPair AF;
     RegPair BC;
     RegPair DE;
@@ -47,6 +44,10 @@ class CPU {
     bool haltBug;
     bool ime;
     bool imeScheduled;
+
+    bool doPreciseTiming;
+    u8 curCycle;
+    u8 targetCycles;
 
     static constexpr u8 Z_FLAG = 1 << 7;  // Zero flag
     static constexpr u8 N_FLAG = 1 << 6;  // Subtract flag

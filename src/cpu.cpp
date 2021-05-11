@@ -390,9 +390,9 @@ void CPU::restart() {
 }
 
 void CPU::handle_interrupts() {
-    // TODO handle push to IE
-    u8 ifReg = memory->read(Memory::IF_REG);
-    u8 interrupts = ifReg & memory->read(Memory::IE_REG) & 0x1F;
+    // TODO handle weird push to IE case
+    u8 ifReg = memory->read(IOReg::IF_REG);
+    u8 interrupts = ifReg & memory->read(IOReg::IE_REG) & 0x1F;
     if (interrupts) {
         // if (halted) cycleAcc++;  // Extra cycle if cpu is in halt mode
 
@@ -402,7 +402,7 @@ void CPU::handle_interrupts() {
                     printf("Interrupt! %02x from %02x\n", i * 0x8 + 0x40, PC);
                     call(i * 0x8 + 0x40);
                     ime = false;
-                    write(Memory::IF_REG, ifReg & ~(1 << i));
+                    write(IOReg::IF_REG, ifReg & ~(1 << i));
 
                     cycleAcc++;  // Interrupt handling takes total of 5 cycles (+1 if halted)
                     break;
@@ -417,22 +417,14 @@ void CPU::handle_interrupts() {
     }
 }
 
+bool CPU::isFetching() { return curCycle == 0; }
+
 bool test = false;
 int stall = 0;
 void CPU::emulate_cycle() {
     if (isFetching()) {
         cycleAcc = 0;
         doPreciseTiming = false;
-
-        // if (PC == 0x48) {
-        // if (PC == 0x174) {
-        // if (stall > 1) {
-        // debugger->pause_exec();
-        // test = true;
-        // } else {
-        // stall++;
-        // }
-        // }
 
         if (debugger->is_paused()) debugger->print_instr();
         debugger->update_instr(PC);
@@ -461,7 +453,6 @@ void CPU::emulate_cycle() {
             if (haltBug) {
                 PC--;
                 haltBug = false;
-                // TODO figure out whether to subtract extra clocks
             }
             (this->*opcodes[op])();
 
@@ -474,8 +465,6 @@ void CPU::emulate_cycle() {
     }
     curCycle = (curCycle + 1) % targetCycles;
 }
-
-bool CPU::isFetching() { return curCycle == 0; }
 
 u8 CPU::n() {
     debugger->inc_instr_bytes();
@@ -505,7 +494,7 @@ bool CPU::check_flag(u8 flag) { return (AF.lo & flag) != 0; }
 void CPU::op00() {}                       // NOP
 void CPU::op10() { printf("stop!!\n"); }  // STOP
 void CPU::op76() {
-    u8 interrupts = memory->read(Memory::IF_REG) & memory->read(Memory::IE_REG) & 0x1F;
+    u8 interrupts = memory->read(IOReg::IF_REG) & memory->read(IOReg::IE_REG) & 0x1F;
     halted = ime || !interrupts;
     if (!halted) haltBug = true;
 }  // HALT

@@ -1,19 +1,17 @@
 #include "ppu.hpp"
 
-#include <stdio.h>
-
 #include "game_boy.hpp"
 
 void PPU::init(Memory* memory) {
     this->memory = memory;
-    lcdc = &memory->ref(Memory::LCDC_REG);
-    stat = &memory->ref(Memory::STAT_REG);
-    scy = &memory->ref(Memory::SCY_REG);
-    scx = &memory->ref(Memory::SCX_REG);
-    ly = &memory->ref(Memory::LY_REG);
-    lyc = &memory->ref(Memory::LYC_REG);
-    wy = &memory->ref(Memory::WY_REG);
-    wx = &memory->ref(Memory::WX_REG);
+    lcdc = &memory->ref(IOReg::LCDC_REG);
+    stat = &memory->ref(IOReg::STAT_REG);
+    scy = &memory->ref(IOReg::SCY_REG);
+    scx = &memory->ref(IOReg::SCX_REG);
+    ly = &memory->ref(IOReg::LY_REG);
+    lyc = &memory->ref(IOReg::LYC_REG);
+    wy = &memory->ref(IOReg::WY_REG);
+    wx = &memory->ref(IOReg::WX_REG);
 
     for (int i = 0; i < GameBoy::WIDTH * GameBoy::HEIGHT; i++) {
         frameBuffer[i] = BLANK_COLOR;
@@ -144,7 +142,7 @@ void PPU::emulate_clock() {
                 update_coincidence(*lyc);
 
                 if (*ly >= GameBoy::HEIGHT) {
-                    memory->request_interrupt(Memory::VBLANK_INT);
+                    memory->request_interrupt(Interrupt::VBLANK_INT);
                     set_mode(V_BLANK);
                 } else {
                     set_mode(OAM_SEARCH);
@@ -219,11 +217,11 @@ void PPU::background_fetch() {
                         bool hi = fetcher.data1 & align;
                         bool lo = fetcher.data0 & align;
                         u8 col = (hi << 1) | lo;
-                        bgFifo.push({col, false, Memory::BGP_REG});
+                        bgFifo.push({col, false, IOReg::BGP_REG});
                     }
                 } else {
                     for (int i = 0; i < TILE_PX_SIZE; i++) {
-                        bgFifo.push({0, false, Memory::BGP_REG});
+                        bgFifo.push({0, false, IOReg::BGP_REG});
                     }
                 }
                 fetcher.tileX++;
@@ -282,9 +280,9 @@ void PPU::sprite_fetch() {
                 if (col != 0 && !bgFifo.get(i)->isSprite) {
                     if (!bgPriority || bgFifo.get(i)->colIndex == 0) {
                         if (isObjectPalette1) {
-                            bgFifo.set(i, {col, true, Memory::OBP1_REG});
+                            bgFifo.set(i, {col, true, IOReg::OBP1_REG});
                         } else {
-                            bgFifo.set(i, {col, true, Memory::OBP0_REG});
+                            bgFifo.set(i, {col, true, IOReg::OBP0_REG});
                         }
                     }
                 }
@@ -322,14 +320,14 @@ u8 PPU::read_ly() {
 void PPU::update_stat_intr() {
     if ((*stat & (1 << 6)) && (read_ly() == *lyc) && !statTrigger) {
         statTrigger = true;
-        memory->request_interrupt(Memory::STAT_INT);
+        memory->request_interrupt(Interrupt::STAT_INT);
     }
     for (int i = 3; i <= 5; i++) {
         if (*stat & (1 << i)) {
             if (mode == i - 3) {
                 if (!statTrigger) {
                     statTrigger = true;
-                    memory->request_interrupt(Memory::STAT_INT);
+                    memory->request_interrupt(Interrupt::STAT_INT);
                 }
                 return;
             }

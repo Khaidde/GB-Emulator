@@ -1,46 +1,13 @@
 #include "input.hpp"
+#include "memory.hpp"
 
-void Input::handle_input(SDL_Event keyEvent) {
-    if (keyEvent.type != SDL_KEYDOWN && keyEvent.type != SDL_KEYUP) return;
-
-    u8 key;
-    switch (keyEvent.key.keysym.sym) {
-        case SDLK_n:  // START
-            key = 7;
-            break;
-        case SDLK_b:  // SELECT
-            key = 6;
-            break;
-        case SDLK_j:  // B
-            key = 5;
-            break;
-        case SDLK_k:  // A
-            key = 4;
-            break;
-
-        case SDLK_s:  // DOWN
-            key = 3;
-            break;
-        case SDLK_w:  // UP
-            key = 2;
-            break;
-        case SDLK_a:  // LEFT
-            key = 1;
-            break;
-        case SDLK_d:  // RIGHT
-            key = 0;
-            break;
-        default:
-            return;
-    }
-
+void Input::handle_input(bool pressed, u8 key) {
     u8 keyBit = 1 << key;
-    bool isPress = keyEvent.type == SDL_KEYDOWN;
 
-    if (!(~keystate & keyBit) && isPress) {
-        memory->request_interrupt(Memory::JOYPAD_INT);
+    if (!(~keystate & keyBit) && pressed) {
+        memory->request_interrupt(Interrupt::JOYPAD_INT);
     }
-    keystate = (keystate | keyBit) & ~(keyBit * isPress);
+    keystate = (keystate | keyBit) & ~(keyBit * pressed);
 }
 
 u8 Input::get_key_state(bool btnSelect, bool dirSelect) {
