@@ -40,7 +40,6 @@ class GameBoy {
     CPU cpu;
     Memory memory;
 
-    Cartridge cartridge;
     Input input;
     Timer timer;
     PPU ppu;

@@ -26,11 +26,12 @@ GameBoy::GameBoy(const char* romPath) {
     cpu.init(&memory, &debugger);
     memory.init(&debugger);
 
-    cartridge.load_from_path(romPath);
-    ppu.init(&memory);
+    memory.load_cartridge(romPath);
+
     input.init(&memory);
     timer.init(&memory);
-    memory.load_peripherals(&cartridge, &input, &timer);
+    ppu.init(&memory);
+    memory.load_peripherals(&input, &timer, &ppu);
 
     create_screen(screen, GameBoy::WIDTH * Screen::PIXEL_SCALE, GameBoy::HEIGHT * Screen::PIXEL_SCALE, GameBoy::TITLE);
 }
@@ -71,14 +72,14 @@ void GameBoy::begin() {
         }
 
         while (totalMCycles < (int)PPU::TOTAL_CLOCKS / 4) {
-            if (debugger.is_paused() && !debugger.step()) break;
+            if (cpu.isFetching() && debugger.is_paused() && !debugger.step()) break;
 
-            u8 mCycles = cpu.tick();
-            timer.tick(mCycles);
-            for (int i = 0; i < mCycles * 4; i++) {
+            for (int c = 0; c < 4; c++) {
+                timer.emulate_clock();
                 ppu.emulate_clock();
             }
-            totalMCycles += mCycles;
+            cpu.emulate_cycle();
+            totalMCycles++;
         }
         render_screen();
 
@@ -86,7 +87,7 @@ void GameBoy::begin() {
         delta += std::chrono::duration_cast<std::chrono::nanoseconds>(now - last);
         last = now;
         if (delta >= FRAME_MS) {
-            totalMCycles = 0;
+            totalMCycles -= (int)PPU::TOTAL_CLOCKS / 4;
             delta -= FRAME_MS;
         }
     }

@@ -9,9 +9,15 @@ int main(int argc, char** argv) {
     }
     SDL_Init(SDL_INIT_VIDEO);
 
-    GameBoy gameBoy(argv[1]);
+    try {
+        GameBoy gameBoy(argv[1]);
 
-    gameBoy.begin();
+        gameBoy.begin();
+    } catch (const std::exception& e) {
+        fprintf(stderr, e.what());
+        SDL_Quit();
+        return 1;
+    }
 
     SDL_Quit();
     return 0;

@@ -6,9 +6,12 @@
 
 void PPU::init(Memory* memory) {
     this->memory = memory;
-    ly = &memory->ref(Memory::LY_REG);
+    lcdc = &memory->ref(Memory::LCDC_REG);
+    stat = &memory->ref(Memory::STAT_REG);
     scy = &memory->ref(Memory::SCY_REG);
     scx = &memory->ref(Memory::SCX_REG);
+    ly = &memory->ref(Memory::LY_REG);
+    lyc = &memory->ref(Memory::LYC_REG);
     wy = &memory->ref(Memory::WY_REG);
     wx = &memory->ref(Memory::WX_REG);
 
@@ -16,6 +19,8 @@ void PPU::init(Memory* memory) {
         frameBuffer[i] = BLANK_COLOR;
     }
     drawClocks = 0;
+
+    statTrigger = false;
 }
 
 void PPU::render(u32* pixelBuffer) {
@@ -24,15 +29,30 @@ void PPU::render(u32* pixelBuffer) {
     }
 }
 
+extern bool test;
 void PPU::emulate_clock() {
     if (!get_lcdc_flag(LCD_ENABLE)) {
         drawClocks = 0;
         mode = OAM_SEARCH;
+        *stat = (*stat & 0xFC) | 2;
+        statTrigger = false;
         return;
+    }
+    if (test && *ly >= 0x8F) {
+        if (mode == OAM_SEARCH) {
+            printf("%d\n", (OAM_SEARCH_CLOCKS - drawClocks) / 2);
+        }
+        if (mode == V_BLANK) {
+            printf("%d\n", (SCAN_LINE_CLOCKS - drawClocks) / 2);
+        }
     }
     drawClocks++;
     switch (mode) {
         case OAM_SEARCH:
+            if (drawClocks == 5) {
+                *stat = (*stat & 0xFC) | mode;
+                update_stat_intr();
+            }
             if (drawClocks >= OAM_SEARCH_CLOCKS) {
                 drawClocks -= OAM_SEARCH_CLOCKS;
 
@@ -58,11 +78,15 @@ void PPU::emulate_clock() {
 
                 bgFifo.clear();
 
-                mode = LCD_TRANSFER;
+                set_mode(LCD_TRANSFER);
                 // TODO prohibit cpu vram access
             }
             break;
         case LCD_TRANSFER: {
+            if (drawClocks == 5) {
+                *stat = (*stat & 0xFC) | mode;
+                update_stat_intr();
+            }
             if (bgFifo.size > 8 && !fetcher.curSprite) {
                 if (numDiscardedPixels < *scx % TILE_PX_SIZE) {
                     numDiscardedPixels++;
@@ -106,30 +130,45 @@ void PPU::emulate_clock() {
 
             if (curPixelX == GameBoy::WIDTH) {
                 // printf("----------------------ly=%d,c=%d\n", *ly, drawClocks);
-                mode = H_BLANK;
+                set_mode(H_BLANK);
             }
         } break;
         case H_BLANK:
-            if (drawClocks >= H_BLANK_CLOCKS + LCD_TRANSFER_CLOCKS) {
-                drawClocks -= H_BLANK_CLOCKS + LCD_TRANSFER_CLOCKS;
-                memory->inc(Memory::LY_REG);
+            if (drawClocks == 5) {
+                *stat = (*stat & 0xFC) | mode;
+                update_stat_intr();
+            }
+            if (drawClocks >= LCD_AND_H_BLANK_CLOCKS) {
+                drawClocks -= LCD_AND_H_BLANK_CLOCKS;
+                (*ly)++;
+                update_coincidence(*lyc);
 
-                if (memory->read(Memory::LY_REG) >= GameBoy::HEIGHT) {
+                if (*ly >= GameBoy::HEIGHT) {
                     memory->request_interrupt(Memory::VBLANK_INT);
-                    mode = V_BLANK;
+                    set_mode(V_BLANK);
                 } else {
-                    mode = OAM_SEARCH;
+                    set_mode(OAM_SEARCH);
                 }
             }
             break;
         case V_BLANK:
+            if (drawClocks == 5) {
+                if (*ly == GameBoy::HEIGHT) {
+                    *stat = (*stat & 0xFC) | mode;
+                    update_stat_intr();
+                } else if (*ly == V_BLANK_END_LINE - 1) {
+                    update_coincidence(*lyc);
+                }
+            }
             if (drawClocks >= SCAN_LINE_CLOCKS) {
                 drawClocks -= SCAN_LINE_CLOCKS;
-                memory->inc(Memory::LY_REG);
+                (*ly)++;
+                update_coincidence(*lyc);
 
-                if (memory->read(Memory::LY_REG) >= V_BLANK_END_LINE) {
-                    mode = OAM_SEARCH;
-                    memory->write(Memory::LY_REG, 0);
+                if (*ly >= V_BLANK_END_LINE) {
+                    *ly = 0;
+                    update_coincidence(*lyc);
+                    set_mode(OAM_SEARCH);
                 }
             }
             break;
@@ -144,14 +183,14 @@ void PPU::background_fetch() {
                               : 0x9800;
 
             s8 tileIndex;
-            if (fetcher.windowMode) {
-                printf("TODO window mode not implemented yet\n");
-                tileIndex = 0;
-            } else {
-                u8 tileX = (*scx / TILE_PX_SIZE + fetcher.tileX) % TILESET_SIZE;
-                u8 tileY = ((*scy + *ly) / TILE_PX_SIZE) % TILESET_SIZE;
-                tileIndex = memory->read((tileX + tileY * TILESET_SIZE) + tileMap);
-            }
+            // if (fetcher.windowMode) {
+            // printf("TODO window mode not implemented yet\n");
+            // tileIndex = 0;
+            // } else {
+            u8 tileX = (*scx / TILE_PX_SIZE + fetcher.tileX) % TILESET_SIZE;
+            u8 tileY = ((*scy + *ly) / TILE_PX_SIZE) % TILESET_SIZE;
+            tileIndex = memory->read((tileX + tileY * TILESET_SIZE) + tileMap);
+            // }
 
             u8 tileByteOff = ((*ly + *scy) % TILE_PX_SIZE) * 2;
             bool unsign = get_lcdc_flag(TILE_DATA_SELECT);
@@ -201,7 +240,7 @@ void PPU::sprite_fetch() {
         case Fetcher::READ_TILE_ID: {
             u8 tileIndex = fetcher.curSprite->tileID;
             if (get_lcdc_flag(SPRITE_SIZE)) {
-                printf("TODO test tall sprite mode");
+                // printf("TODO test tall sprite mode");
                 tileIndex &= ~0x1;  // Make tileIndex even
             }
 
@@ -256,7 +295,48 @@ void PPU::sprite_fetch() {
     }
 }
 
-bool PPU::get_lcdc_flag(LCDCFlag flag) { return memory->read(Memory::LCDC_REG) & (1 << flag); }
+bool PPU::get_lcdc_flag(LCDCFlag flag) { return *lcdc & (1 << flag); }
+
+void PPU::set_mode(Mode mode) {
+    // When switching from oam_search to v_blank, momentarily switch to h_blank
+    if (mode == OAM_SEARCH && this->mode == V_BLANK) {
+        *stat = (*stat & 0xFC);
+    }
+    // TODO only delay stat mode change on DMG
+    this->mode = mode;
+    if (test) {
+        printf("mode switch to %d-ly=%d\n", mode, *ly);
+    }
+}
+
+void PPU::update_coincidence(u8 lyc) {
+    *stat = (*stat & 0xFB) | ((read_ly() == lyc) << 2);
+    update_stat_intr();
+}
+
+u8 PPU::read_ly() {
+    if (*ly == 0x99 && drawClocks > 4) return 0;
+    return *ly;
+}
+
+void PPU::update_stat_intr() {
+    if ((*stat & (1 << 6)) && (read_ly() == *lyc) && !statTrigger) {
+        statTrigger = true;
+        memory->request_interrupt(Memory::STAT_INT);
+    }
+    for (int i = 3; i <= 5; i++) {
+        if (*stat & (1 << i)) {
+            if (mode == i - 3) {
+                if (!statTrigger) {
+                    statTrigger = true;
+                    memory->request_interrupt(Memory::STAT_INT);
+                }
+                return;
+            }
+        }
+    }
+    statTrigger = false;
+}
 
 u32 PPU::get_color(FIFOData&& data) {
     data.colIndex &= 0x03;

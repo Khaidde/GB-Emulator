@@ -7,7 +7,7 @@ class Memory;
 class Timer {
    public:
     void init(Memory* memory);
-    void tick(u8 cycles);
+    void emulate_clock();
 
     void reset_div() {
         *div = 0;
@@ -24,6 +24,7 @@ class Timer {
     Memory* memory;
 
     u8* div;
+    u8* tima;
     u16 clocks;
     bool oldBitSet;
     bool timaScheduled;

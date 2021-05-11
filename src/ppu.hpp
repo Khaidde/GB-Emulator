@@ -3,32 +3,7 @@
 #include "memory.hpp"
 #include "utils.hpp"
 
-struct FIFOData {
-    u8 colIndex;
-    bool isSprite;
-    u16 palleteAddr;
-};
-
-template <int capacity>
-struct Fifo {
-    u8 offset = 0;
-    u8 size = 0;
-    FIFOData data[capacity];
-
-    void clear() {
-        offset = 0;
-        size = 0;
-    }
-    FIFOData* get(u8 index) { return &data[(index + offset) % capacity]; }
-    void set(u8 index, FIFOData&& val) { data[(index + offset) % capacity] = val; }
-    void push(FIFOData&& val) { data[(offset + size++) % capacity] = val; }
-    FIFOData pop() {
-        FIFOData val = data[offset];
-        offset = (offset + 1) % capacity;
-        size--;
-        return val;
-    }
-};
+class Memory;
 
 struct Sprite {
     u8 y;
@@ -53,34 +28,34 @@ struct SpriteList {
 
 class PPU {
    public:
-    static constexpr u8 OAM_SEARCH_CLOCKS = 80;
+    static constexpr int OAM_SEARCH_CLOCKS = 80;
 
-    static constexpr u8 LCD_TRANSFER_CLOCKS = 172;
+    static constexpr int LCD_AND_H_BLANK_CLOCKS = 376;
 
-    static constexpr u8 H_BLANK_CLOCKS = 204;
-    static constexpr u16 SCAN_LINE_CLOCKS = OAM_SEARCH_CLOCKS + LCD_TRANSFER_CLOCKS + H_BLANK_CLOCKS;
-    static constexpr u8 V_BLANK_END_LINE = 154;
+    static constexpr int SCAN_LINE_CLOCKS = OAM_SEARCH_CLOCKS + LCD_AND_H_BLANK_CLOCKS;
+    static constexpr int V_BLANK_END_LINE = 154;
 
-    static constexpr u32 TOTAL_CLOCKS = SCAN_LINE_CLOCKS * V_BLANK_END_LINE;
+    static constexpr int TOTAL_CLOCKS = SCAN_LINE_CLOCKS * V_BLANK_END_LINE;
 
     void init(Memory* memory);
     void render(u32* pixelBuffer);
     void emulate_clock();
 
+    void update_coincidence(u8 lyc);
+
+    u8 read_ly();
+
    private:
     Memory* memory;
-    u8* ly;
+    u8* lcdc;
+    u8* stat;
     u8* scy;
     u8* scx;
+    u8* ly;
+    u8* lyc;
     u8* wy;
     u8* wx;
 
-    enum Mode : u8 {
-        H_BLANK = 0,
-        V_BLANK = 1,
-        OAM_SEARCH = 2,
-        LCD_TRANSFER = 3,
-    } mode = OAM_SEARCH;
     u16 drawClocks;
 
     SpriteList spriteList;
@@ -109,8 +84,13 @@ class PPU {
         u8 tileX;
     } fetcher;
 
+    struct FIFOData {
+        u8 colIndex;
+        bool isSprite;
+        u16 palleteAddr;
+    };
     static constexpr u8 FIFO_SIZE = 16;
-    Fifo<FIFO_SIZE> bgFifo;
+    Queue<FIFOData, FIFO_SIZE> bgFifo;
 
     u8 numDiscardedPixels;
     u8 curPixelX;
@@ -131,6 +111,22 @@ class PPU {
         LCD_ENABLE = 7,
     };
     bool get_lcdc_flag(LCDCFlag flag);
+
+    enum STATIntrFlag : char {
+        LYC_LY_INTR = 6,
+        MODE_2_INTR = 5,
+        MODE_1_INTR = 4,
+        MODE_0_INTR = 3,
+    };
+    enum Mode : u8 {
+        H_BLANK = 0,
+        V_BLANK = 1,
+        OAM_SEARCH = 2,
+        LCD_TRANSFER = 3,
+    } mode = OAM_SEARCH;
+    bool statTrigger;
+    void set_mode(Mode mode);
+    void update_stat_intr();
 
     const u32 baseColors[4] = {0xFFFFF6D3, 0xFFF9A875, 0xFFEB6B6F, 0xFF7C3F58};
     const u32 BLANK_COLOR = 0xFF101010;

@@ -2,13 +2,17 @@
 
 #include "cartridge.hpp"
 #include "debugger.hpp"
+#include "ppu.hpp"
 #include "input.hpp"
 #include "timer.hpp"
 #include "utils.hpp"
 
+#include <memory>
+
 class Debugger;
 class Input;
 class Timer;
+class PPU;
 
 class Memory {
    public:
@@ -59,22 +63,24 @@ class Memory {
     };
 
     void init(Debugger* debugger);
+    void load_cartridge(const char* romPath);
     void restart();
-    void load_peripherals(Cartridge* cartridge, Input* input, Timer* timer);
+    void load_peripherals(Input* input, Timer* timer, PPU* ppu);
 
     void request_interrupt(Interrupt interrupt);
 
-    u8& ref(u16 address) { return mem[address]; }
+    u8& ref(u16 address);
     u8 read(u16 address);
     void write(u16 address, u8 val);
-    void inc(u16 address);
 
    private:
     Debugger* debugger;
 
-    Cartridge* cartridge;
+    std::unique_ptr<Cartridge> cartridge;
+
     Input* input;
     Timer* timer;
+    PPU* ppu;
 
     static constexpr int MEMORY_SIZE = 0x10000;
     u8 mem[MEMORY_SIZE];

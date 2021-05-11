@@ -29,7 +29,8 @@ void Debugger::print_instr() {
     printf("\tAF=%04x BC=%04x DE=%04x HL=%04x\n", cpu->AF.pair, cpu->BC.pair, cpu->DE.pair, cpu->HL.pair);
     printf("\tSP=%04x PC=%04x\n", cpu->SP, cpu->PC);
     printf("\time=%d if=%02x ie=%02x\n", cpu->ime, memory->read(Memory::IF_REG), memory->read(Memory::IE_REG));
-    printf("\tly=%02x lcdc=%02x\n", memory->read(Memory::LY_REG), memory->read(Memory::LCDC_REG));
+    printf("\tly=%02x lcdc=%02x stat=%02x\n", memory->read(Memory::LY_REG), memory->read(Memory::LCDC_REG),
+           memory->read(Memory::STAT_REG));
 
     // print_reg(Memory::JOYP_REG, "Joypad");
 
@@ -41,17 +42,16 @@ void Debugger::print_instr() {
     print_reg(Memory::TMA_REG, "Timer Modulo");
     print_reg(Memory::TAC_REG, "Timer Control");
 
-    // printf("thing=%02x\n", memory->read(0xDD00));
+    print_reg(Memory::LYC_REG, "lyc");
     /*
-        print_reg(Memory::STAT_REG, "STAT");
-        print_reg(Memory::SCY_REG, "Y-Scoll");
-        print_reg(Memory::SCX_REG, "X-Scoll");
-        print_reg(Memory::BGP_REG, "Background Palette");
-        print_reg(Memory::OBP0_REG, "Object Palette 0");
-        print_reg(Memory::OBP1_REG, "Object Palette 1");
-        print_reg(Memory::WY_REG, "Window Y");
-        print_reg(Memory::WX_REG, "Window X");
-        */
+    print_reg(Memory::SCY_REG, "Y-Scoll");
+    print_reg(Memory::SCX_REG, "X-Scoll");
+    print_reg(Memory::BGP_REG, "Background Palette");
+    print_reg(Memory::OBP0_REG, "Object Palette 0");
+    print_reg(Memory::OBP1_REG, "Object Palette 1");
+    print_reg(Memory::WY_REG, "Window Y");
+    print_reg(Memory::WX_REG, "Window X");
+    */
 }
 
 void Debugger::handle_function_key(SDL_Event e) {
