@@ -25,6 +25,25 @@ struct SpriteList {
     void remove(u8 index) { removedBitField |= 1 << index; }
 };
 
+struct Fetcher {
+    bool doFetch;
+    enum {
+        READ_TILE_ID,
+        READ_TILE_0,
+        READ_TILE_1,
+        PUSH,
+    } fetchState;
+    Sprite* curSprite;
+
+    bool windowMode;
+
+    u16 tileRowAddr;
+    u8 data0;
+    u8 data1;
+
+    u8 tileX;
+};
+
 class PPU {
    public:
     static constexpr int OAM_SEARCH_CLOCKS = 80;
@@ -56,6 +75,8 @@ class PPU {
     u8* wy;
     u8* wx;
 
+    u32 frameBuffer[160 * 144];
+
     u16 drawClocks;
 
     SpriteList spriteList;
@@ -65,24 +86,7 @@ class PPU {
     static constexpr u8 TILE_PX_SIZE = 8;  // width and height of a tile in pixels
     static constexpr u16 VRAM_TILE_DATA_0 = 0x8000;
     static constexpr u16 VRAM_TILE_DATA_1 = 0x9000;
-    struct Fetcher {
-        bool doFetch;
-        enum {
-            READ_TILE_ID,
-            READ_TILE_0,
-            READ_TILE_1,
-            PUSH,
-        } fetchState;
-        Sprite* curSprite;
-
-        bool windowMode;
-
-        u16 tileRowAddr;
-        u8 data0;
-        u8 data1;
-
-        u8 tileX;
-    } fetcher;
+    Fetcher fetcher;
 
     struct FIFOData {
         u8 colIndex;
@@ -90,17 +94,15 @@ class PPU {
         u16 palleteAddr;
     };
     static constexpr u8 FIFO_SIZE = 16;
-    Queue<FIFOData, FIFO_SIZE> bgFifo;
+    Queue<FIFOData, FIFO_SIZE> pxlFifo;
 
     u8 numDiscardedPixels;
     u8 curPixelX;
 
-    u32 frameBuffer[160 * 144];
-
     void background_fetch();
     void sprite_fetch();
 
-    enum LCDCFlag : char {
+    enum class LCDCFlag : u8 {
         BG_WINDOW_ENABLE = 0,
         SPRITE_ENABLE = 1,
         SPRITE_SIZE = 2,
@@ -112,18 +114,20 @@ class PPU {
     };
     bool get_lcdc_flag(LCDCFlag flag);
 
-    enum STATIntrFlag : char {
+    enum class STATIntrFlag : char {
         LYC_LY_INTR = 6,
         MODE_2_INTR = 5,
         MODE_1_INTR = 4,
         MODE_0_INTR = 3,
     };
+
     enum Mode : u8 {
         H_BLANK = 0,
         V_BLANK = 1,
         OAM_SEARCH = 2,
         LCD_TRANSFER = 3,
-    } mode = OAM_SEARCH;
+    } mode = Mode::OAM_SEARCH;
+
     bool statTrigger;
     void set_mode(Mode mode);
     void update_stat_intr();

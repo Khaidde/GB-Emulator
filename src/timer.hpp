@@ -9,16 +9,9 @@ class Timer {
     void init(Memory* memory);
     void emulate_clock();
 
-    void reset_div() {
-        *div = 0;
-        clocks = 0;
-    }
-    void set_enable(bool enabled) { this->enabled = enabled; }
-
-    void set_frequency(u8 mode) {
-        static constexpr u8 freqList[4] = {9, 3, 5, 7};
-        bitFreq = freqList[mode];
-    }
+    void reset_div();
+    void set_enable(bool enabled);
+    void set_frequency(u8 mode);
 
    private:
     Memory* memory;

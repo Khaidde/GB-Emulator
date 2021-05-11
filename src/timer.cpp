@@ -33,3 +33,14 @@ void Timer::emulate_clock() {
 
     *div = clocks >> 8;
 }
+
+void Timer::reset_div() {
+    *div = 0;
+    clocks = 0;
+}
+void Timer::set_enable(bool enabled) { this->enabled = enabled; }
+
+void Timer::set_frequency(u8 mode) {
+    static constexpr u8 freqList[4] = {9, 3, 5, 7};
+    bitFreq = freqList[mode];
+}

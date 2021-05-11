@@ -35,11 +35,12 @@ GameBoy::GameBoy(const char* romPath) {
 
     cpu.init(&memory, &debugger);
 
-    timer.init(&memory);
-    ppu.init(&memory);
-
     memory.set_debugger(&debugger);
     memory.load_cartridge(romPath);
+
+    input.init(&memory);
+    timer.init(&memory);
+    ppu.init(&memory);
     memory.set_peripherals(&input, &timer, &ppu);
 
     create_screen(screen, GameBoy::WIDTH * Screen::PIXEL_SCALE, GameBoy::HEIGHT * Screen::PIXEL_SCALE, GameBoy::TITLE);
@@ -66,13 +67,15 @@ void GameBoy::begin() {
                 case SDL_QUIT:
                     running = false;
                     break;
-                case SDL_KEYUP:
+                case SDL_KEYUP: {
+                    char key = get_gb_key(e.key.keysym.sym);
                     debugger.handle_function_key(e);
-                    input.handle_input(false, get_gb_key(e.key.keysym.sym));
-                    break;
-                case SDL_KEYDOWN:
-                    input.handle_input(true, get_gb_key(e.key.keysym.sym));
-                    break;
+                    if (key >= 0) input.handle_input(false, key);
+                } break;
+                case SDL_KEYDOWN: {
+                    char key = get_gb_key(e.key.keysym.sym);
+                    if (key >= 0) input.handle_input(true, key);
+                } break;
             }
             break;
         }
