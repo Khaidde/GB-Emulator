@@ -18,11 +18,13 @@ void Debugger::print_reg(u16 address, const char* name) {
 }
 
 void Debugger::print_instr() {
+    /*
     printf("[%2.4x] %02x ", opPC, memory->read(opPC));
     for (int i = instrByteLen - 1; i > 0; i--) {
         printf("%02x", memory->read(opPC + i));
     }
     printf("\n");
+    */
 
     printf("\tZNHC=%d%d%d%d\n", cpu->check_flag(CPU::Z_FLAG), cpu->check_flag(CPU::N_FLAG),
            cpu->check_flag(CPU::H_FLAG), cpu->check_flag(CPU::C_FLAG));
@@ -42,7 +44,6 @@ void Debugger::print_instr() {
     print_reg(IOReg::TMA_REG, "Timer Modulo");
     print_reg(IOReg::TAC_REG, "Timer Control");
 
-    print_reg(IOReg::LYC_REG, "lyc");
     /*
     print_reg(IOReg::SCY_REG, "Y-Scoll");
     print_reg(IOReg::SCX_REG, "X-Scoll");

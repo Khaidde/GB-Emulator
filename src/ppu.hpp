@@ -59,7 +59,8 @@ class PPU {
     void render(u32* pixelBuffer);
     void emulate_clock();
 
-    void update_coincidence(u8 lyc);
+    void update_stat();
+    void trigger_stat_intr();
 
     u8 read_ly();
 
@@ -99,9 +100,6 @@ class PPU {
     u8 numDiscardedPixels;
     u8 curPixelX;
 
-    void background_fetch();
-    void sprite_fetch();
-
     enum class LCDCFlag : u8 {
         BG_WINDOW_ENABLE = 0,
         SPRITE_ENABLE = 1,
@@ -112,7 +110,6 @@ class PPU {
         WINDOW_TILE_SELECT = 6,
         LCD_ENABLE = 7,
     };
-    bool get_lcdc_flag(LCDCFlag flag);
 
     enum class STATIntrFlag : char {
         LYC_LY_INTR = 6,
@@ -126,14 +123,21 @@ class PPU {
         V_BLANK = 1,
         OAM_SEARCH = 2,
         LCD_TRANSFER = 3,
-    } mode = Mode::OAM_SEARCH;
-
+    } mode;
     bool statTrigger;
-    void set_mode(Mode mode);
-    void update_stat_intr();
+    bool curCycleStatTrigger;
+    int modeSwitchClocks;
 
     const u32 baseColors[4] = {0xFFFFF6D3, 0xFFF9A875, 0xFFEB6B6F, 0xFF7C3F58};
     const u32 BLANK_COLOR = 0xFF101010;
+
+    void background_fetch();
+    void sprite_fetch();
+
+    bool get_lcdc_flag(LCDCFlag flag);
+
+    void set_mode(Mode mode);
+
     u32 get_color(FIFOData&& data);
 
     u16 get_sprite_addr(u8 index);

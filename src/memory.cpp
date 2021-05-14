@@ -5,7 +5,10 @@
 #include <string.h>
 #include <vector>
 
-Memory::Memory() { restart(); }
+Memory::Memory() {
+    reset_cycles();
+    restart();
+}
 
 void Memory::restart() {
     mem[IOReg::TIMA_REG] = 0x00;
@@ -13,7 +16,7 @@ void Memory::restart() {
     mem[IOReg::TAC_REG] = 0xF8;
 
     mem[IOReg::LCDC_REG] = 0x91;
-    mem[IOReg::STAT_REG] = 0x82;  // ppu mode should be 2 (oam scan)
+    mem[IOReg::STAT_REG] = 0x85;  // ppu mode should be 1 (v_blank)
     mem[IOReg::SCY_REG] = 0x00;
     mem[IOReg::SCX_REG] = 0x00;
     mem[IOReg::LYC_REG] = 0x00;
@@ -24,7 +27,7 @@ void Memory::restart() {
     mem[IOReg::WY_REG] = 0x00;
     mem[IOReg::WX_REG] = 0x00;
 
-    mem[IOReg::IF_REG] = 0xE0;
+    mem[IOReg::IF_REG] = 0xE1;
     mem[IOReg::IE_REG] = 0x00;
 }
 
@@ -34,9 +37,6 @@ void Memory::set_peripherals(Input* input, Timer* timer, PPU* ppu) {
     this->input = input;
     this->timer = timer;
     this->ppu = ppu;
-
-    timer->init(this);
-    ppu->init(this);
 }
 
 void Memory::load_cartridge(const char* romPath) {
@@ -50,7 +50,6 @@ void Memory::load_cartridge(const char* romPath) {
     file.seekg(0);
     file.read((char*)&rom[0], romSize);
     file.close();
-    printf("%08x\n", romSize);
 
     char title[16];
     int i = 0;
@@ -143,6 +142,8 @@ void Memory::load_cartridge(const char* romPath) {
     printf("Checksum: %s\n", (x & 0xF) == rom[0x014D] ? "PASSED" : "FAILED");
 }
 
+void Memory::request_interrupt(Interrupt interrupt) { write(IOReg::IF_REG, read(IOReg::IF_REG) | (u8)interrupt); }
+
 u8& Memory::ref(u16 addr) { return mem[addr]; }
 
 u8 Memory::read(u16 addr) {
@@ -179,6 +180,9 @@ void Memory::write(u16 addr, u8 val) {
         case IOReg::JOYP_REG:
             mem[addr] = 0xC0 | (val & 0x30) | (mem[addr] & 0x0F);
             return;
+        case IOReg::SB_REG:
+            printf("%c", val);
+            break;
         case IOReg::SC_REG:
             mem[addr] = (val & (1 << 8)) | 0x7E | (val & 1);
             return;
@@ -195,10 +199,14 @@ void Memory::write(u16 addr, u8 val) {
             break;
         case IOReg::STAT_REG:
             mem[addr] = 0x80 | (val & 0x78) | (mem[addr] & 0x7);
+            ppu->update_stat();
+            ppu->trigger_stat_intr();
             return;
         case IOReg::LYC_REG:
-            ppu->update_coincidence(val);
-            break;
+            mem[addr] = val;
+            ppu->update_stat();
+            ppu->trigger_stat_intr();
+            return;
         case IOReg::DMA_REG: {
             if (0xFE <= val && val <= 0xFF) {
                 printf("TODO illegal DMA source value\n");
@@ -216,4 +224,36 @@ void Memory::write(u16 addr, u8 val) {
     mem[addr] = val;
 }
 
-void Memory::request_interrupt(Interrupt interrupt) { write(IOReg::IF_REG, read(IOReg::IF_REG) | (u8)interrupt); }
+void Memory::schedule_read(u8* dest, u16 addr, u8 cycle) {
+    MemoryOp readOp;
+    readOp.cycle = cycle;
+    readOp.isWrite = false;
+    readOp.addr = addr;
+    readOp.readDest = dest;
+    scheduledMemoryOps.push_tail(std::move(readOp));
+}
+
+void Memory::schedule_write(u16 addr, u8* val, u8 cycle) {
+    MemoryOp writeOp;
+    writeOp.cycle = cycle;
+    writeOp.isWrite = true;
+    writeOp.addr = addr;
+    writeOp.writeVal = val;
+    scheduledMemoryOps.push_tail(std::move(writeOp));
+}
+
+void Memory::emulate_cycle() {
+    cycleCnt++;
+    if (scheduledMemoryOps.size > 0) {
+        if (scheduledMemoryOps.head().cycle == cycleCnt) {
+            MemoryOp memOp = scheduledMemoryOps.pop_head();
+            if (memOp.isWrite) {
+                write(memOp.addr, *memOp.writeVal);
+            } else {
+                *memOp.readDest = read(memOp.addr);
+            }
+        }
+    }
+}
+
+void Memory::reset_cycles() { cycleCnt = 0; }

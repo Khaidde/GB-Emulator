@@ -384,16 +384,23 @@ void CPU::restart() {
     SP = 0xFFFE;
     PC = 0x0100;
     ime = false;
+    imeScheduled = false;
     halted = false;
+    haltBug = false;
 
-    curCycle = 0;
+    cycleCnt = 0;
+
+    readCycle = 0;
 }
 
+bool test = false;
+extern u8 cnt;
 void CPU::handle_interrupts() {
     // TODO handle weird push to IE case
     u8 ifReg = memory->read(IOReg::IF_REG);
     u8 interrupts = ifReg & memory->read(IOReg::IE_REG) & 0x1F;
     if (interrupts) {
+        // TODO only add extra cycle if emulating CGB
         // if (halted) cycleAcc++;  // Extra cycle if cpu is in halt mode
 
         if (ime) {
@@ -404,7 +411,7 @@ void CPU::handle_interrupts() {
                     ime = false;
                     write(IOReg::IF_REG, ifReg & ~(1 << i));
 
-                    cycleAcc++;  // Interrupt handling takes total of 5 cycles (+1 if halted)
+                    cycleCnt++;  // Interrupt handling takes total of 5 cycles (+1 if halted)
                     break;
                 }
             }
@@ -417,55 +424,59 @@ void CPU::handle_interrupts() {
     }
 }
 
-bool CPU::isFetching() { return curCycle == 0; }
+bool CPU::isFetching() { return cycleCnt == 0; }
 
-bool test = false;
-int stall = 0;
 void CPU::emulate_cycle() {
     if (isFetching()) {
-        cycleAcc = 0;
-        doPreciseTiming = false;
+        if (test) printf("cc=%d PC=%02x\n", cnt + 2, PC);
 
-        if (debugger->is_paused()) debugger->print_instr();
-        debugger->update_instr(PC);
-
-        handle_interrupts();  // Interrupts are checked before fetching a new instruction
-        if (cycleAcc == 0) {
-            if (halted) {
-                return;
-            }
-
-            if (PC == 0x1D2 && BC.hi == 0x13) {
-                // if (PC == 0x175) {
-                // if (PC == 0x48) {
-                // if (PC == 0x174) {
-                if (stall > 2) {
-                    // debugger->pause_exec();
-                    // test = true;
-                } else {
-                    stall++;
-                }
-            }
-
-            if (test) printf("-------\n");
-            op = n();
-
-            if (haltBug) {
-                PC--;
-                haltBug = false;
-            }
-            (this->*opcodes[op])();
-
-            if (!doPreciseTiming) targetCycles = cycleAcc;
-        } else {
-            targetCycles = cycleAcc;  // If an interrupt occurred, handle those cycles first
+        if (halted) {
+            return;
         }
-    } else if (doPreciseTiming) {
+
+        u8 op = n();
+        if (debugger->is_paused()) {
+            printf("fetch--%04x-%02x\n", PC - 1, op);
+        }
+
+        if (haltBug) {
+            PC--;
+            haltBug = false;
+        }
         (this->*opcodes[op])();
     }
-    curCycle = (curCycle + 1) % targetCycles;
+
+    cycleCnt--;
+    if (cycleCnt == 0) {
+        if (debugger->is_paused()) {
+            printf("---------------\n");
+            debugger->print_instr();
+        }
+        debugger->update_instr(PC);
+
+        // if (PC == 0x210 && AF.hi == 0x98 && cnt == 8) {
+        // if (memory->read(IOReg::LY_REG) == 0x8F && cnt == 8) {
+        // if (PC == 0x212 && AF.hi == 0x40) {
+        // if (PC == 0x21C && AF.hi == 0) {
+        // if (PC == 0x22d) {
+        // if (PC == 0x1D2 && memory->read(IOReg::LY_REG) == 0x00) {
+        // if (PC == 0x196) {
+        // if (PC == 0x1C1) {
+        // debugger->pause_exec();
+        // test = true;
+        // }
+    }
+
+    if (readCycle > 0) {
+        readCycle--;
+        if (readCycle == 0) {
+            readCallback(this);
+        }
+    }
 }
 
+void CPU::set_flag(u8 flag, bool set) { AF.lo = (AF.lo & ~flag) | (flag * set); }
+bool CPU::check_flag(u8 flag) { return (AF.lo & flag) != 0; }
 u8 CPU::n() {
     debugger->inc_instr_bytes();
     return read(PC++);
@@ -479,16 +490,27 @@ u16 CPU::nn() {
     debugger->inc_instr_bytes();
     return res;
 }
-void CPU::write(u16 addr, u8 val) {
-    cycleAcc++;
-    memory->write(addr, val);
-}
 u8 CPU::read(u16 addr) {
-    cycleAcc++;
+    cycleCnt++;
     return memory->read(addr);
 }
-void CPU::set_flag(u8 flag, bool set) { AF.lo = (AF.lo & ~flag) | (flag * set); }
-bool CPU::check_flag(u8 flag) { return (AF.lo & flag) != 0; }
+void CPU::write(u16 addr, u8 val) {
+    cycleCnt++;
+    memory->write(addr, val);
+}
+void CPU::skd_read(u8& dest, u16 addr, ReadCallback&& callback) {
+    skd_read(dest, addr);
+    readCycle = cycleCnt;
+    readCallback = callback;
+}
+void CPU::skd_read(u8& dest, u16 addr) {
+    memory->schedule_read(&dest, addr, cycleCnt);
+    cycleCnt++;
+}
+void CPU::skd_write(u16 addr, u8& val) {
+    memory->schedule_write(addr, &val, cycleCnt);
+    cycleCnt++;
+}
 
 // ----- Intructions -----
 void CPU::op00() {}                       // NOP
@@ -516,12 +538,8 @@ void CPU::op06() { BC.hi = n(); }  // LD B, n
 void CPU::op16() { DE.hi = n(); }  // LD D, n
 void CPU::op26() { HL.hi = n(); }  // LD H, n
 void CPU::op36() {
-    if (curCycle == 0) {
-        targetCycles = 3;
-        doPreciseTiming = true;
-    } else if (curCycle == 1) {
-        write(HL.pair, n());
-    }
+    valReg = n();
+    skd_write(HL.pair, valReg);
 }  // LD (HL), n
 void CPU::op0E() { BC.lo = n(); }  // LD C, n
 void CPU::op1E() { DE.lo = n(); }  // LD E, n
@@ -614,44 +632,16 @@ void CPU::op7E() { AF.hi = read(HL.pair); }  // LD A, (HL)
 void CPU::op7F() {}                          // LD A, A
 
 // load $FF00 + n
-void CPU::opE0() {
-    if (curCycle == 0) {
-        targetCycles = 3;
-        doPreciseTiming = true;
-    } else if (curCycle == 1) {
-        write(0xFF00 + n(), AF.hi);
-    }
-}  // LDH ($FF00 + n), A
-void CPU::opF0() {
-    if (curCycle == 0) {
-        targetCycles = 3;
-        doPreciseTiming = true;
-    } else if (curCycle == 1) {
-        AF.hi = read(0xFF00 + n());
-    }
-}  // LDH A, ($FF00 + n)
+void CPU::opE0() { skd_write(0xFF00 + n(), AF.hi); }  // LDH ($FF00 + n), A
+void CPU::opF0() { skd_read(AF.hi, 0xFF00 + n()); }   // LDH A, ($FF00 + n)
 
 // load $FF00 + C
 void CPU::opE2() { write(BC.lo + 0xFF00, AF.hi); }  // LD (C), A [A -> $FF00 + C]
 void CPU::opF2() { AF.hi = read(BC.lo + 0xFF00); }  // LD A, (C) [$FF00 + C -> A]
 
-void CPU::opEA() {
-    if (curCycle == 0) {
-        targetCycles = 4;
-        doPreciseTiming = true;
-    } else if (curCycle == 2) {
-        write(nn(), AF.hi);
-    }
-}  // LD (nn), A
+void CPU::opEA() { skd_write(nn(), AF.hi); }  // LD (nn), A
 
-void CPU::opFA() {
-    if (curCycle == 0) {
-        targetCycles = 4;
-        doPreciseTiming = true;
-    } else if (curCycle == 2) {
-        AF.hi = read(nn());
-    }
-}  // LD A, (nn)
+void CPU::opFA() { skd_read(AF.hi, nn()); }
 
 // ----- 16-bit -----
 
@@ -679,7 +669,7 @@ void CPU::opF1() {
 
 // push
 void CPU::push(u16 reg) {
-    cycleAcc++;  // Stack push takes an extra cycle
+    cycleCnt++;  // Stack push takes an extra cycle
     write(--SP, reg >> 8);
     write(--SP, reg & 0xFF);
 }
@@ -695,7 +685,7 @@ void CPU::op08() {
 }  // LD (nn), SP
 
 void CPU::opF9() {
-    cycleAcc++;
+    cycleCnt++;
     SP = HL.pair;
 }  // LD SP, HL
 
@@ -864,15 +854,9 @@ void CPU::op1C() { inc8(DE.lo); }  // INC E
 void CPU::op24() { inc8(HL.hi); }  // INC H
 void CPU::op2C() { inc8(HL.lo); }  // INC L
 void CPU::op34() {
-    static u8 val;
-    if (curCycle == 0) {
-        targetCycles = 3;
-        doPreciseTiming = true;
-        val = read(HL.pair);
-        inc8(val);
-    } else if (curCycle == 1) {
-        write(HL.pair, val);
-    }
+    valReg = read(HL.pair);
+    inc8(valReg);
+    skd_write(HL.pair, valReg);
 }  // INC (HL)
 void CPU::op3C() { inc8(AF.hi); }  // INC A
 
@@ -890,15 +874,9 @@ void CPU::op1D() { dec8(DE.lo); }  // DEC E
 void CPU::op25() { dec8(HL.hi); }  // DEC H
 void CPU::op2D() { dec8(HL.lo); }  // DEC L
 void CPU::op35() {
-    static u8 val;
-    if (curCycle == 0) {
-        targetCycles = 3;
-        doPreciseTiming = true;
-        val = read(HL.pair);
-        dec8(val);
-    } else if (curCycle == 1) {
-        write(HL.pair, val);
-    }
+    valReg = read(HL.pair);
+    dec8(valReg);
+    skd_write(HL.pair, valReg);
 }  // DEC (HL)
 void CPU::op3D() { dec8(AF.hi); }  // DEC A
 
@@ -911,7 +889,7 @@ void CPU::add16_to_HL(u16 val) {
     set_flag(H_FLAG, (0xFFF - (HL.pair & 0xFFF)) < (val & 0xFFF));
     set_flag(C_FLAG, (0xFFFF - HL.pair) < val);
     HL.pair = res;
-    cycleAcc++;
+    cycleCnt++;
 }
 void CPU::op09() { add16_to_HL(BC.pair); }  // ADD HL, BC
 void CPU::op19() { add16_to_HL(DE.pair); }  // ADD HL, DE
@@ -934,47 +912,47 @@ u16 CPU::addSP_n() {
     // set_flag(H_FLAG, ((stackPtr ^ off) & 0x10) == 0x10);
     // set_flag(C_FLAG, ((stackPtr ^ off) & 0x100) == 0x100);
 
-    cycleAcc++;
+    cycleCnt++;
     return res;
 }
 void CPU::opE8() {
-    cycleAcc++;
+    cycleCnt++;
     SP = addSP_n();
 }  // ADD SP, n
 void CPU::opF8() { HL.pair = addSP_n(); }  // LD HL, SP + n
 
 // INC nn
 void CPU::op03() {
-    cycleAcc++;
+    cycleCnt++;
     BC.pair++;
 }  // INC BC
 void CPU::op13() {
-    cycleAcc++;
+    cycleCnt++;
     DE.pair++;
 }  // INC DE
 void CPU::op23() {
-    cycleAcc++;
+    cycleCnt++;
     HL.pair++;
 }  // INC HL
 void CPU::op33() {
-    cycleAcc++;
+    cycleCnt++;
     SP++;
 }  // INC SP
 
 void CPU::op0B() {
-    cycleAcc++;
+    cycleCnt++;
     BC.pair--;
 }  // DEC BC
 void CPU::op1B() {
-    cycleAcc++;
+    cycleCnt++;
     DE.pair--;
 }  // DEC DE
 void CPU::op2B() {
-    cycleAcc++;
+    cycleCnt++;
     HL.pair--;
 }  // DEC HL
 void CPU::op3B() {
-    cycleAcc++;
+    cycleCnt++;
     SP--;
 }  // DEC SP
 
@@ -1034,7 +1012,7 @@ void CPU::op3F() {
 
 // ----- Jump -----
 void CPU::jump(u16 addr) {
-    cycleAcc++;
+    cycleCnt++;
     PC = addr;
 }
 void CPU::opC3() { jump(nn()); }  // JP nn
@@ -1143,25 +1121,25 @@ void CPU::opFF() { call(0x38); }  // RST 38H
 void CPU::opC9() { jump(pop()); }  // RET
 
 void CPU::opC0() {
-    cycleAcc++;
+    cycleCnt++;
     if (!check_flag(Z_FLAG)) {
         jump(pop());
     }
 }  // RET NZ
 void CPU::opD0() {
-    cycleAcc++;
+    cycleCnt++;
     if (!check_flag(C_FLAG)) {
         jump(pop());
     }
 }  // RET NC
 void CPU::opC8() {
-    cycleAcc++;
+    cycleCnt++;
     if (check_flag(Z_FLAG)) {
         jump(pop());
     }
 }  // RET Z
 void CPU::opD8() {
-    cycleAcc++;
+    cycleCnt++;
     if (check_flag(C_FLAG)) {
         jump(pop());
     }
@@ -1191,21 +1169,13 @@ void CPU::opFD() { freeze(); }
 
 // ----- CB-prefix -----
 void CPU::opCB() {
-    static u8 index;
-    static u8 b;
-    if (curCycle == 0) {
-        cbOp = n();
-        if (cbOp >= 0x40) {
-            index = ((cbOp / 0x40) - 1) * 0x8 + (cbOp % 0x8);
-            b = (cbOp / 0x8) % 0x8;
-        }
-    }
-    if (curCycle == 0 || doPreciseTiming) {
-        if (cbOp < 0x40) {
-            (this->*opcodesCB[cbOp])();
-        } else {
-            (this->*bitOpcodesCB[index])(b);
-        }
+    u8 cbOp = n();
+    if (cbOp < 0x40) {
+        (this->*opcodesCB[cbOp])();
+    } else {
+        u8 index = ((cbOp / 0x40) - 1) * 0x8 + (cbOp % 0x8);
+        u8 b = (cbOp / 0x8) % 0x8;
+        (this->*bitOpcodesCB[index])(b);
     }
 }  // CB-prefix
 
@@ -1224,16 +1194,8 @@ void CPU::opCB33() { swap(DE.lo); }  // SWAP E
 void CPU::opCB34() { swap(HL.hi); }  // SWAP H
 void CPU::opCB35() { swap(HL.lo); }  // SWAP L
 void CPU::opCB36() {
-    static u8 val;
-    if (curCycle == 0) {
-        targetCycles = 4;
-        doPreciseTiming = true;
-    } else if (curCycle == 1) {
-        val = read(HL.pair);
-        swap(val);
-    } else if (curCycle == 2) {
-        write(HL.pair, val);
-    }
+    skd_read(valReg, HL.pair, [](CPU* c) { c->swap(c->valReg); });
+    skd_write(HL.pair, valReg);
 }  // SWAP (HL)
 void CPU::opCB37() { swap(AF.hi); }  // SWAP A
 
@@ -1252,16 +1214,8 @@ void CPU::opCB03() { rlc8(DE.lo); }  // RLC E
 void CPU::opCB04() { rlc8(HL.hi); }  // RLC H
 void CPU::opCB05() { rlc8(HL.lo); }  // RLC L
 void CPU::opCB06() {
-    static u8 val;
-    if (curCycle == 0) {
-        targetCycles = 4;
-        doPreciseTiming = true;
-    } else if (curCycle == 1) {
-        val = read(HL.pair);
-        rlc8(val);
-    } else if (curCycle == 2) {
-        write(HL.pair, val);
-    }
+    skd_read(valReg, HL.pair, [](CPU* c) { c->rlc8(c->valReg); });
+    skd_write(HL.pair, valReg);
 }  // RLC (HL)
 void CPU::opCB07() { rlc8(AF.hi); }  // RLC A
 
@@ -1280,16 +1234,8 @@ void CPU::opCB0B() { rrc8(DE.lo); }  // RRC E
 void CPU::opCB0C() { rrc8(HL.hi); }  // RRC H
 void CPU::opCB0D() { rrc8(HL.lo); }  // RRC L
 void CPU::opCB0E() {
-    static u8 val;
-    if (curCycle == 0) {
-        targetCycles = 4;
-        doPreciseTiming = true;
-    } else if (curCycle == 1) {
-        val = read(HL.pair);
-        rrc8(val);
-    } else if (curCycle == 2) {
-        write(HL.pair, val);
-    }
+    skd_read(valReg, HL.pair, [](CPU* c) { c->rrc8(c->valReg); });
+    skd_write(HL.pair, valReg);
 }  // RRC (HL)
 void CPU::opCB0F() { rrc8(AF.hi); }  // RRC A
 
@@ -1311,16 +1257,8 @@ void CPU::opCB13() { rl8(DE.lo); }  // RL E
 void CPU::opCB14() { rl8(HL.hi); }  // RL H
 void CPU::opCB15() { rl8(HL.lo); }  // RL L
 void CPU::opCB16() {
-    static u8 val;
-    if (curCycle == 0) {
-        targetCycles = 4;
-        doPreciseTiming = true;
-    } else if (curCycle == 1) {
-        val = read(HL.pair);
-        rl8(val);
-    } else if (curCycle == 2) {
-        write(HL.pair, val);
-    }
+    skd_read(valReg, HL.pair, [](CPU* c) { c->rl8(c->valReg); });
+    skd_write(HL.pair, valReg);
 }  // RL (HL)
 void CPU::opCB17() { rl8(AF.hi); }  // RL A
 
@@ -1340,16 +1278,8 @@ void CPU::opCB1B() { rr8(DE.lo); }  // RR E
 void CPU::opCB1C() { rr8(HL.hi); }  // RR H
 void CPU::opCB1D() { rr8(HL.lo); }  // RR L
 void CPU::opCB1E() {
-    static u8 val;
-    if (curCycle == 0) {
-        targetCycles = 4;
-        doPreciseTiming = true;
-    } else if (curCycle == 1) {
-        val = read(HL.pair);
-        rr8(val);
-    } else if (curCycle == 2) {
-        write(HL.pair, val);
-    }
+    skd_read(valReg, HL.pair, [](CPU* c) { c->rr8(c->valReg); });
+    skd_write(HL.pair, valReg);
 }  // RR (HL)
 void CPU::opCB1F() { rr8(AF.hi); }  // RR A
 
@@ -1368,16 +1298,8 @@ void CPU::opCB23() { sla8(DE.lo); }  // SLA E
 void CPU::opCB24() { sla8(HL.hi); }  // SLA H
 void CPU::opCB25() { sla8(HL.lo); }  // SLA L
 void CPU::opCB26() {
-    static u8 val;
-    if (curCycle == 0) {
-        targetCycles = 4;
-        doPreciseTiming = true;
-    } else if (curCycle == 1) {
-        val = read(HL.pair);
-        sla8(val);
-    } else if (curCycle == 2) {
-        write(HL.pair, val);
-    }
+    skd_read(valReg, HL.pair, [](CPU* c) { c->sla8(c->valReg); });
+    skd_write(HL.pair, valReg);
 }  // SLA (HL)
 void CPU::opCB27() { sla8(AF.hi); }  // SLA A
 
@@ -1396,16 +1318,8 @@ void CPU::opCB2B() { sra8(DE.lo); }  // SRA E
 void CPU::opCB2C() { sra8(HL.hi); }  // SRA H
 void CPU::opCB2D() { sra8(HL.lo); }  // SRA L
 void CPU::opCB2E() {
-    static u8 val;
-    if (curCycle == 0) {
-        targetCycles = 4;
-        doPreciseTiming = true;
-    } else if (curCycle == 1) {
-        val = read(HL.pair);
-        sra8(val);
-    } else if (curCycle == 2) {
-        write(HL.pair, val);
-    }
+    skd_read(valReg, HL.pair, [](CPU* c) { c->sra8(c->valReg); });
+    skd_write(HL.pair, valReg);
 }  // SRA (HL)
 void CPU::opCB2F() { sra8(AF.hi); }  // SRA A
 
@@ -1424,16 +1338,8 @@ void CPU::opCB3B() { srl8(DE.lo); }  // SRL E
 void CPU::opCB3C() { srl8(HL.hi); }  // SRL H
 void CPU::opCB3D() { srl8(HL.lo); }  // SRL L
 void CPU::opCB3E() {
-    static u8 val = read(HL.pair);
-    if (curCycle == 0) {
-        targetCycles = 4;
-        doPreciseTiming = true;
-    } else if (curCycle == 1) {
-        val = read(HL.pair);
-        srl8(val);
-    } else if (curCycle == 2) {
-        write(HL.pair, val);
-    }
+    skd_read(valReg, HL.pair, [](CPU* c) { c->srl8(c->valReg); });
+    skd_write(HL.pair, valReg);
 }  // SRL (HL)
 void CPU::opCB3F() { srl8(AF.hi); }  // SRL A
 
@@ -1450,12 +1356,9 @@ void CPU::opCB_bitE(u8 b) { bit(b, DE.lo); }  // BIT b, E
 void CPU::opCB_bitH(u8 b) { bit(b, HL.hi); }  // BIT b, H
 void CPU::opCB_bitL(u8 b) { bit(b, HL.lo); }  // BIT b, L
 void CPU::opCB_bitHL(u8 b) {
-    if (curCycle == 0) {
-        targetCycles = 3;
-        doPreciseTiming = true;
-    } else if (curCycle == 1) {
-        bit(b, read(HL.pair));
-    }
+    static u8 bitReg;
+    bitReg = b;
+    skd_read(valReg, HL.pair, [](CPU* c) { c->bit(bitReg, c->valReg); });
 }  // BIT b, (HL)
 void CPU::opCB_bitA(u8 b) { bit(b, AF.hi); }  // BIT b, A
 
@@ -1468,16 +1371,10 @@ void CPU::opCB_resE(u8 b) { res(b, DE.lo); }  // RES b, E
 void CPU::opCB_resH(u8 b) { res(b, HL.hi); }  // RES b, H
 void CPU::opCB_resL(u8 b) { res(b, HL.lo); }  // RES b, L
 void CPU::opCB_resHL(u8 b) {
-    static u8 val;
-    if (curCycle == 0) {
-        targetCycles = 4;
-        doPreciseTiming = true;
-    } else if (curCycle == 1) {
-        val = read(HL.pair);
-        res(b, val);
-    } else if (curCycle == 2) {
-        write(HL.pair, val);
-    }
+    static u8 bitReg;
+    bitReg = b;
+    skd_read(valReg, HL.pair, [](CPU* c) { c->res(bitReg, c->valReg); });
+    skd_write(HL.pair, valReg);
 }  // RES b, (HL)
 void CPU::opCB_resA(u8 b) { res(b, AF.hi); }  // RES b, A
 
@@ -1490,15 +1387,9 @@ void CPU::opCB_setE(u8 b) { set(b, DE.lo); }  // SET b, E
 void CPU::opCB_setH(u8 b) { set(b, HL.hi); }  // SET b, H
 void CPU::opCB_setL(u8 b) { set(b, HL.lo); }  // SET b, L
 void CPU::opCB_setHL(u8 b) {
-    static u8 val;
-    if (curCycle == 0) {
-        targetCycles = 4;
-        doPreciseTiming = true;
-    } else if (curCycle == 1) {
-        val = read(HL.pair);
-        set(b, val);
-    } else if (curCycle == 2) {
-        write(HL.pair, val);
-    }
+    static u8 bitReg;
+    bitReg = b;
+    skd_read(valReg, HL.pair, [](CPU* c) { c->set(bitReg, c->valReg); });
+    skd_write(HL.pair, valReg);
 }  // SET b, (HL)
 void CPU::opCB_setA(u8 b) { set(b, AF.hi); }  // SET b, A

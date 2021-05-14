@@ -16,9 +16,14 @@ void PPU::init(Memory* memory) {
     for (int i = 0; i < GameBoy::WIDTH * GameBoy::HEIGHT; i++) {
         frameBuffer[i] = BLANK_COLOR;
     }
-    drawClocks = 0;
+
+    drawClocks = 400;  // initial drawn clocks at PC=0x100
+    mode = V_BLANK;
+    *ly = 0x99;
 
     statTrigger = false;
+    curCycleStatTrigger = false;
+    modeSwitchClocks = 0;
 }
 
 void PPU::render(u32* pixelBuffer) {
@@ -28,29 +33,41 @@ void PPU::render(u32* pixelBuffer) {
 }
 
 extern bool test;
+int cnt = 0;
 void PPU::emulate_clock() {
     if (!get_lcdc_flag(LCDCFlag::LCD_ENABLE)) {
         drawClocks = 0;
-        mode = Mode::OAM_SEARCH;
+        mode = Mode::H_BLANK;
         *stat = (*stat & 0xFC) | 2;
         statTrigger = false;
         return;
     }
-    if (test && *ly >= 0x8F) {
-        if (mode == Mode::OAM_SEARCH) {
-            printf("%d\n", (OAM_SEARCH_CLOCKS - drawClocks) / 2);
-        }
-        if (mode == Mode::V_BLANK) {
-            printf("%d\n", (SCAN_LINE_CLOCKS - drawClocks) / 2);
+    drawClocks++;
+    if (mode == Mode::OAM_SEARCH) {
+        cnt = (OAM_SEARCH_CLOCKS - drawClocks) / 2;
+    }
+    if (mode == Mode::LCD_TRANSFER) {
+        cnt = (172 - drawClocks) / 2;
+    }
+    if (mode == Mode::H_BLANK) {
+        cnt = (LCD_AND_H_BLANK_CLOCKS - drawClocks) / 2;
+    }
+    if (mode == Mode::V_BLANK) {
+        cnt = (SCAN_LINE_CLOCKS - drawClocks) / 2;
+    }
+    if (test) {
+        printf("\t\t\t%d-%d\n", cnt, drawClocks);
+    }
+    curCycleStatTrigger = false;
+    if (modeSwitchClocks > 0) {
+        modeSwitchClocks--;
+        if (modeSwitchClocks == 0) {
+            *stat = (*stat & 0xFC) | mode;
+            update_stat();
         }
     }
-    drawClocks++;
     switch (mode) {
         case Mode::OAM_SEARCH:
-            if (drawClocks == 5) {
-                *stat = (*stat & 0xFC) | mode;
-                update_stat_intr();
-            }
             if (drawClocks >= OAM_SEARCH_CLOCKS) {
                 drawClocks -= OAM_SEARCH_CLOCKS;
 
@@ -81,14 +98,10 @@ void PPU::emulate_clock() {
             }
             break;
         case LCD_TRANSFER: {
-            if (drawClocks == 5) {
-                *stat = (*stat & 0xFC) | mode;
-                update_stat_intr();
-            }
             if (pxlFifo.size > 8 && !fetcher.curSprite) {
                 if (numDiscardedPixels < *scx % TILE_PX_SIZE) {
                     numDiscardedPixels++;
-                    pxlFifo.pop();
+                    pxlFifo.pop_head();
                 } else {
                     if (!fetcher.windowMode && get_lcdc_flag(LCDCFlag::WINDOW_ENABLE) &&
                         get_lcdc_flag(LCDCFlag::BG_WINDOW_ENABLE) && *ly == *wy && curPixelX >= *wx - 7) {
@@ -111,7 +124,7 @@ void PPU::emulate_clock() {
                             }
                         }
                         if (!fetcher.curSprite) {
-                            frameBuffer[*ly * GameBoy::WIDTH + curPixelX++] = get_color(pxlFifo.pop());
+                            frameBuffer[*ly * GameBoy::WIDTH + curPixelX++] = get_color(pxlFifo.pop_head());
                         }
                     }
                 }
@@ -132,14 +145,10 @@ void PPU::emulate_clock() {
             }
         } break;
         case H_BLANK:
-            if (drawClocks == 5) {
-                *stat = (*stat & 0xFC) | mode;
-                update_stat_intr();
-            }
             if (drawClocks >= LCD_AND_H_BLANK_CLOCKS) {
                 drawClocks -= LCD_AND_H_BLANK_CLOCKS;
                 (*ly)++;
-                update_coincidence(*lyc);
+                update_stat();
 
                 if (*ly >= GameBoy::HEIGHT) {
                     memory->request_interrupt(Interrupt::VBLANK_INT);
@@ -150,27 +159,28 @@ void PPU::emulate_clock() {
             }
             break;
         case V_BLANK:
-            if (drawClocks == 5) {
-                if (*ly == GameBoy::HEIGHT) {
-                    *stat = (*stat & 0xFC) | mode;
-                    update_stat_intr();
-                } else if (*ly == V_BLANK_END_LINE - 1) {
-                    update_coincidence(*lyc);
-                }
+            if (drawClocks == 5 && *ly == V_BLANK_END_LINE - 1) {
+                update_stat();
             }
             if (drawClocks >= SCAN_LINE_CLOCKS) {
                 drawClocks -= SCAN_LINE_CLOCKS;
                 (*ly)++;
-                update_coincidence(*lyc);
+                update_stat();
 
                 if (*ly >= V_BLANK_END_LINE) {
                     *ly = 0;
-                    update_coincidence(*lyc);
+                    update_stat();
                     set_mode(OAM_SEARCH);
                 }
             }
             break;
     }
+    trigger_stat_intr();
+}
+
+u8 PPU::read_ly() {
+    if (*ly == 0x99 && drawClocks > 4) return 0;
+    return *ly;
 }
 
 void PPU::background_fetch() {
@@ -218,11 +228,11 @@ void PPU::background_fetch() {
                         bool hi = fetcher.data1 & align;
                         bool lo = fetcher.data0 & align;
                         u8 col = (hi << 1) | lo;
-                        pxlFifo.push({col, false, IOReg::BGP_REG});
+                        pxlFifo.push_tail({col, false, IOReg::BGP_REG});
                     }
                 } else {
                     for (int i = 0; i < TILE_PX_SIZE; i++) {
-                        pxlFifo.push({0, false, IOReg::BGP_REG});
+                        pxlFifo.push_tail({0, false, IOReg::BGP_REG});
                     }
                 }
                 fetcher.tileX++;
@@ -302,37 +312,36 @@ void PPU::set_mode(Mode mode) {
         *stat = (*stat & 0xFC);
     }
     // TODO only delay stat mode change on DMG
+    this->modeSwitchClocks = 4;
     this->mode = mode;
-    if (test) {
-        printf("mode switch to %d-ly=%d\n", mode, *ly);
-    }
 }
 
-void PPU::update_coincidence(u8 lyc) {
-    *stat = (*stat & 0xFB) | ((read_ly() == lyc) << 2);
-    update_stat_intr();
-}
+void PPU::update_stat() {
+    bool coincidence = read_ly() == *lyc;
+    *stat = (*stat & 0xFB) | (coincidence << 2);  // update coincidence flag
 
-u8 PPU::read_ly() {
-    if (*ly == 0x99 && drawClocks > 4) return 0;
-    return *ly;
-}
-
-void PPU::update_stat_intr() {
-    if ((*stat & (1 << 6)) && (read_ly() == *lyc) && !statTrigger) {
-        statTrigger = true;
-        memory->request_interrupt(Interrupt::STAT_INT);
-    }
-    for (int i = 3; i <= 5; i++) {
-        if (*stat & (1 << i) && mode == i - 3) {
-            if (!statTrigger) {
-                statTrigger = true;
-                memory->request_interrupt(Interrupt::STAT_INT);
+    bool lyLycEn = *stat & (1 << 6);
+    if (lyLycEn && coincidence) {
+        curCycleStatTrigger = true;
+    } else {
+        for (int i = 3; i <= 5; i++) {
+            if (*stat & (1 << i) && mode == i - 3) {
+                curCycleStatTrigger = true;
+                break;
             }
-            return;
         }
     }
-    statTrigger = false;
+}
+
+void PPU::trigger_stat_intr() {
+    if (curCycleStatTrigger) {
+        if (!statTrigger) {
+            statTrigger = true;
+            memory->request_interrupt(Interrupt::STAT_INT);
+        }
+    } else {
+        statTrigger = false;
+    }
 }
 
 u32 PPU::get_color(FIFOData&& data) {

@@ -37,30 +37,33 @@ class CPU {
 
     u16 SP;
     u16 PC;
-    u16 op;
-    u16 cbOp;
+
+    u8 valReg;  // temporary register used for delayed memory read and writes
 
     bool halted;
     bool haltBug;
     bool ime;
     bool imeScheduled;
 
-    bool doPreciseTiming;
-    u8 curCycle;
-    u8 targetCycles;
-
     static constexpr u8 Z_FLAG = 1 << 7;  // Zero flag
     static constexpr u8 N_FLAG = 1 << 6;  // Subtract flag
     static constexpr u8 H_FLAG = 1 << 5;  // Half Carry flag
     static constexpr u8 C_FLAG = 1 << 4;  // Carry flag
 
-    u8 cycleAcc;
-    u8 n();
-    u16 nn();
-    void write(u16 addr, u8 val);
-    u8 read(u16 addr);
+    u8 cycleCnt;
     void set_flag(u8 flag, bool set);
     bool check_flag(u8 flag);
+    u8 n();
+    u16 nn();
+    u8 read(u16 addr);
+    void write(u16 addr, u8 val);
+
+    u8 readCycle;
+    using ReadCallback = void (*)(CPU* c);
+    ReadCallback readCallback;
+    void skd_read(u8& dest, u16 addr, ReadCallback&& callback);
+    void skd_read(u8& dest, u16 addr);
+    void skd_write(u16 addr, u8& val);
 
     // ----- Instructions -----
     void op00();  // NOP

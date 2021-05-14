@@ -58,8 +58,7 @@ void GameBoy::begin() {
 
     SDL_Event e;
     bool running = true;
-
-    int totalMCycles = 0;
+    int totalTCycles = 0;
 
     while (running) {
         while (SDL_PollEvent(&e)) {
@@ -80,15 +79,20 @@ void GameBoy::begin() {
             break;
         }
 
-        while (totalMCycles < (int)PPU::TOTAL_CLOCKS / 4) {
+        while (totalTCycles < PPU::TOTAL_CLOCKS) {
             if (cpu.isFetching() && debugger.is_paused() && !debugger.step()) break;
 
+            if (cpu.isFetching()) {
+                memory.reset_cycles();
+                cpu.handle_interrupts();  // Interrupts are checked before fetching a new instruction
+            }
             for (int i = 0; i < 4; i++) {
                 timer.emulate_clock();
                 ppu.emulate_clock();
             }
             cpu.emulate_cycle();
-            totalMCycles++;
+            memory.emulate_cycle();
+            totalTCycles += 4;
         }
         render_screen();
 
@@ -96,7 +100,7 @@ void GameBoy::begin() {
         delta += std::chrono::duration_cast<std::chrono::nanoseconds>(now - last);
         last = now;
         if (delta >= FRAME_MS) {
-            totalMCycles -= (int)PPU::TOTAL_CLOCKS / 4;
+            totalTCycles -= PPU::TOTAL_CLOCKS;
             delta -= FRAME_MS;
         }
     }

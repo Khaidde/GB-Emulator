@@ -26,13 +26,15 @@ struct Queue {
     }
     T* get(u8 index) { return &data[(index + offset) % capacity]; }
     void set(u8 index, T&& val) { data[(index + offset) % capacity] = val; }
-    void push(T&& val) { data[(offset + size++) % capacity] = val; }
-    T pop() {
+    void push_tail(T&& val) { data[(offset + size++) % capacity] = val; }
+    T pop_head() {
         T val = data[offset];
         offset = (offset + 1) % capacity;
         size--;
         return val;
     }
+    T head() { return data[offset]; }
+    T tail() { return data[(offset + size) % capacity]; }
 };
 
 namespace IOReg {
