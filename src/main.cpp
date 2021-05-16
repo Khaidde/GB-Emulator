@@ -4,7 +4,7 @@
 
 int main(int argc, char** argv) {
     if (argc != 2) {
-        fprintf(stderr, "Usage: gbemu [romPath].gb");
+        fprintf(stderr, "Usage: gbemu [romPath.gb]");
         return 1;
     }
     SDL_Init(SDL_INIT_VIDEO);

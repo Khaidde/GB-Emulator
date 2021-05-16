@@ -80,8 +80,14 @@ void GameBoy::begin() {
         }
 
         while (totalTCycles < PPU::TOTAL_CLOCKS) {
-            if (cpu.isFetching() && debugger.is_paused() && !debugger.step()) break;
+            if (cpu.isFetching() && debugger.is_paused() && !debugger.step()) {
+                break;
+            }
+            if (cpu.isFetching() && debugger.is_paused()) {
+                printf("---------------\n");
+            }
 
+            memory.emulate_dma_cycle();
             if (cpu.isFetching()) {
                 memory.reset_cycles();
                 cpu.handle_interrupts();  // Interrupts are checked before fetching a new instruction

@@ -428,6 +428,11 @@ bool CPU::isFetching() { return cycleCnt == 0; }
 
 void CPU::emulate_cycle() {
     if (isFetching()) {
+        if (debugger->is_paused()) {
+            debugger->print_instr();
+        }
+        debugger->update_instr(PC);
+
         if (test) printf("cc=%d PC=%02x\n", cnt + 2, PC);
 
         if (halted) {
@@ -448,12 +453,6 @@ void CPU::emulate_cycle() {
 
     cycleCnt--;
     if (cycleCnt == 0) {
-        if (debugger->is_paused()) {
-            printf("---------------\n");
-            debugger->print_instr();
-        }
-        debugger->update_instr(PC);
-
         // if (PC == 0x210 && AF.hi == 0x98 && cnt == 8) {
         // if (memory->read(IOReg::LY_REG) == 0x8F && cnt == 8) {
         // if (PC == 0x212 && AF.hi == 0x40) {
@@ -513,8 +512,13 @@ void CPU::skd_write(u16 addr, u8& val) {
 }
 
 // ----- Intructions -----
-void CPU::op00() {}                       // NOP
-void CPU::op10() { printf("stop!!\n"); }  // STOP
+void CPU::op00() {}  // NOP
+void CPU::op10() {
+    // TODO implement stop functionality correctly
+    // Other emulators seem to wait some amount of cycles before waking up (0x20000 on gambatte)
+
+    PC++;  // Stop instruction will skip the immediate next byte
+}  // STOP
 void CPU::op76() {
     u8 interrupts = memory->read(IOReg::IF_REG) & memory->read(IOReg::IE_REG) & 0x1F;
     halted = ime || !interrupts;
@@ -669,9 +673,18 @@ void CPU::opF1() {
 
 // push
 void CPU::push(u16 reg) {
-    cycleCnt++;  // Stack push takes an extra cycle
-    write(--SP, reg >> 8);
-    write(--SP, reg & 0xFF);
+    // test = true;
+    cycleCnt++;  // Stack push takes an extra blank cycle before pushing
+    // write(--SP, reg >> 8);
+    // write(--SP, reg & 0xFF);
+
+    static u8 msb;
+    static u8 lsb;
+    msb = reg >> 8;
+    lsb = reg & 0xFF;
+    skd_write(--SP, msb);
+    skd_write(--SP, lsb);
+    // debugger->pause_exec();
 }
 void CPU::opC5() { push(BC.pair); }  // PUSH BC
 void CPU::opD5() { push(DE.pair); }  // PUSH DE

@@ -41,6 +41,8 @@ class Memory {
     void schedule_read(u8* dest, u16 addr, u8 cycle);
     void schedule_write(u16 addr, u8* val, u8 cycle);
 
+    void emulate_dma_cycle();
+
     void emulate_cycle();
     void reset_cycles();
 
@@ -58,4 +60,9 @@ class Memory {
 
     Queue<MemoryOp, 16> scheduledMemoryOps;
     u8 cycleCnt;
+
+    bool oamInaccessible;
+    bool scheduleDma;
+    u16 dmaStartAddr;
+    u8 dmaCycleCnt;
 };

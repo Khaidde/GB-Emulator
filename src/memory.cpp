@@ -6,6 +6,9 @@
 #include <vector>
 
 Memory::Memory() {
+    oamInaccessible = false;
+    scheduleDma = false;
+    dmaCycleCnt = 0;
     reset_cycles();
     restart();
 }
@@ -150,7 +153,12 @@ u8 Memory::read(u16 addr) {
     if (addr < 0x8000 || (0xA000 <= addr && addr < 0xC000)) {
         return cartridge->read(addr);
     }
-    if (0xFEA0 <= addr && addr < 0xFF00) return 0;
+    if (0xFE00 <= addr && addr < 0xFEA0 && oamInaccessible) {
+        return 0xFF;
+    }
+    if (0xFEA0 <= addr && addr < 0xFF00) {
+        return 0;
+    }
     switch (addr) {
         case IOReg::JOYP_REG: {
             bool btnSelect = ~mem[addr] & (1 << 5);
@@ -212,10 +220,8 @@ void Memory::write(u16 addr, u8 val) {
                 printf("TODO illegal DMA source value\n");
                 val = mem[addr];
             }
-            u16 start = val << 8;
-            for (int i = 0; i < 0xA0; i++) {
-                mem[0xFE00 + i] = read(start + i);
-            }
+            scheduleDma = true;
+            dmaStartAddr = val << 8;
         } break;
         case IOReg::IF_REG:
             mem[addr] = 0xE0 | (val & 0x1F);
@@ -240,6 +246,26 @@ void Memory::schedule_write(u16 addr, u8* val, u8 cycle) {
     writeOp.addr = addr;
     writeOp.writeVal = val;
     scheduledMemoryOps.push_tail(std::move(writeOp));
+}
+
+void Memory::emulate_dma_cycle() {
+    if (dmaCycleCnt > 0) {
+        if (dmaCycleCnt <= 160) {
+            u8 i = 160 - dmaCycleCnt;
+            mem[0xFE00 + i] = read(dmaStartAddr + i);
+            if (i == 0) {
+                oamInaccessible = true;
+            }
+        }
+        dmaCycleCnt--;
+        if (dmaCycleCnt == 0) {
+            oamInaccessible = false;
+        }
+    }
+    if (scheduleDma) {
+        dmaCycleCnt = 160 + 1;  // DMA takes an extra cycle for initial setup
+        scheduleDma = false;
+    }
 }
 
 void Memory::emulate_cycle() {
