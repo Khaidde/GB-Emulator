@@ -1,4 +1,4 @@
-GB = ./build/gbemu.exe
+GB = gbemu
 roms = ./roms
 
 tetris:

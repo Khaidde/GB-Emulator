@@ -184,6 +184,9 @@ void Memory::write(u16 addr, u8 val) {
         mem[addr + 0x2000] = val;
         return;
     }
+    if (0xFE00 <= addr && addr < 0xFEA0 && oamInaccessible) {
+        return;  // TODO assuming that oam writes have no effect during dma
+    }
     switch (addr) {
         case IOReg::JOYP_REG:
             mem[addr] = 0xC0 | (val & 0x30) | (mem[addr] & 0x0F);
@@ -253,6 +256,7 @@ void Memory::emulate_dma_cycle() {
         if (dmaCycleCnt <= 160) {
             u8 i = 160 - dmaCycleCnt;
             mem[0xFE00 + i] = read(dmaStartAddr + i);
+            // printf("dma...%d\n", i);
             if (i == 0) {
                 oamInaccessible = true;
             }
@@ -275,6 +279,7 @@ void Memory::emulate_cycle() {
             MemoryOp memOp = scheduledMemoryOps.pop_head();
             if (memOp.isWrite) {
                 write(memOp.addr, *memOp.writeVal);
+                // printf("write...\n");
             } else {
                 *memOp.readDest = read(memOp.addr);
             }

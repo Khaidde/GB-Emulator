@@ -13,8 +13,10 @@ void PPU::init(Memory* memory) {
     wy = &memory->ref(IOReg::WY_REG);
     wx = &memory->ref(IOReg::WX_REG);
 
+    bufferSel = 0;
     for (int i = 0; i < GameBoy::WIDTH * GameBoy::HEIGHT; i++) {
-        frameBuffer[i] = BLANK_COLOR;
+        (frameBuffers[0])[i] = BLANK_COLOR;
+        (frameBuffers[1])[i] = BLANK_COLOR;
     }
 
     drawClocks = 400;  // initial drawn clocks at PC=0x100
@@ -27,8 +29,9 @@ void PPU::init(Memory* memory) {
 }
 
 void PPU::render(u32* pixelBuffer) {
+    FrameBuffer* curBuffer = &frameBuffers[!bufferSel];
     for (int i = 0; i < GameBoy::WIDTH * GameBoy::HEIGHT; i++) {
-        pixelBuffer[i] = get_lcdc_flag(LCDCFlag::LCD_ENABLE) ? frameBuffer[i] : BLANK_COLOR;
+        pixelBuffer[i] = get_lcdc_flag(LCDCFlag::LCD_ENABLE) ? (*curBuffer)[i] : BLANK_COLOR;
     }
 }
 
@@ -124,7 +127,7 @@ void PPU::emulate_clock() {
                             }
                         }
                         if (!fetcher.curSprite) {
-                            frameBuffer[*ly * GameBoy::WIDTH + curPixelX++] = get_color(pxlFifo.pop_head());
+                            frameBuffers[bufferSel][*ly * GameBoy::WIDTH + curPixelX++] = get_color(pxlFifo.pop_head());
                         }
                     }
                 }
@@ -168,6 +171,7 @@ void PPU::emulate_clock() {
                 update_stat();
 
                 if (*ly >= V_BLANK_END_LINE) {
+                    bufferSel = !bufferSel;
                     *ly = 0;
                     update_stat();
                     set_mode(OAM_SEARCH);

@@ -102,12 +102,16 @@ void GameBoy::begin() {
         }
         render_screen();
 
-        auto now = sysTimer.now();
-        delta += std::chrono::duration_cast<std::chrono::nanoseconds>(now - last);
-        last = now;
-        if (delta >= FRAME_MS) {
+        if (Debugger::DO_NORMAL_SPEED) {
+            auto now = sysTimer.now();
+            delta += std::chrono::duration_cast<std::chrono::nanoseconds>(now - last);
+            last = now;
+            if (delta >= FRAME_MS) {
+                totalTCycles -= PPU::TOTAL_CLOCKS;
+                delta -= FRAME_MS;
+            }
+        } else {
             totalTCycles -= PPU::TOTAL_CLOCKS;
-            delta -= FRAME_MS;
         }
     }
 }

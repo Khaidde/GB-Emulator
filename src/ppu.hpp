@@ -76,7 +76,9 @@ class PPU {
     u8* wy;
     u8* wx;
 
-    u32 frameBuffer[160 * 144];
+    using FrameBuffer = u32[160 * 144];
+    bool bufferSel;
+    FrameBuffer frameBuffers[2];
 
     u16 drawClocks;
 

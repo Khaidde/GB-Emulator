@@ -12,6 +12,8 @@ class Memory;
 
 class Debugger {
    public:
+    static constexpr bool DO_NORMAL_SPEED = true;
+
     void init(CPU* cpu, Memory* memory);
 
     void update_instr(u16 opPC);
