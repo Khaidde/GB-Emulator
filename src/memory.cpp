@@ -2,18 +2,24 @@
 
 #include <cstdio>
 #include <fstream>
-#include <string.h>
 #include <vector>
 
 Memory::Memory() {
     oamInaccessible = false;
     scheduleDma = false;
     dmaCycleCnt = 0;
+    scheduledMemoryOps.clear();
     reset_cycles();
     restart();
 }
 
 void Memory::restart() {
+    for (int i = 0xFF00; i < 0x10000; i++) {
+        mem[i] = 0xFF;
+    }
+    mem[IOReg::JOYP_REG] = 0xCF;
+    mem[IOReg::SB_REG] = 0x00;
+    mem[IOReg::SC_REG] = 0x7E;
     mem[IOReg::TIMA_REG] = 0x00;
     mem[IOReg::TMA_REG] = 0x00;
     mem[IOReg::TAC_REG] = 0xF8;
@@ -24,9 +30,6 @@ void Memory::restart() {
     mem[IOReg::SCX_REG] = 0x00;
     mem[IOReg::LYC_REG] = 0x00;
     mem[IOReg::BGP_REG] = 0xFC;
-    mem[IOReg::OBP0_REG] = 0xFF;
-    mem[IOReg::OBP1_REG] = 0xFF;
-
     mem[IOReg::WY_REG] = 0x00;
     mem[IOReg::WX_REG] = 0x00;
 
@@ -34,7 +37,7 @@ void Memory::restart() {
     mem[IOReg::IE_REG] = 0x00;
 }
 
-void Memory::set_debugger(Debugger* debugger) { this->debugger = debugger; }
+void Memory::set_debugger(Debugger* debugger) { this->debug = debugger; }
 
 void Memory::set_peripherals(Input* input, Timer* timer, PPU* ppu) {
     this->input = input;
@@ -55,9 +58,9 @@ void Memory::load_cartridge(const char* romPath) {
     file.close();
 
     char title[16];
-    int i = 0;
+    int t = 0;
     for (int c = 0x134; c < 0x144; c++) {
-        title[i++] = rom[c];
+        title[t++] = rom[c];
     }
     printf("Title: %s\n", title);
 
@@ -131,7 +134,6 @@ void Memory::load_cartridge(const char* romPath) {
             break;
         default:
             fatal("Unimplemented cartridge type: %d\n", rom[0x0147]);
-            break;
     }
     if (cartridgeTypeName) printf("Cartridge Type: %s\n", cartridgeTypeName);
 
@@ -160,18 +162,13 @@ u8 Memory::read(u16 addr) {
         return 0;
     }
     switch (addr) {
-        case IOReg::JOYP_REG: {
-            bool btnSelect = ~mem[addr] & (1 << 5);
-            bool dirSelect = ~mem[addr] & (1 << 4);
-            mem[addr] = input->get_key_state(btnSelect, dirSelect);
-            break;
-        }
+        case IOReg::JOYP_REG:
+            return input->get_key_state(mem[addr]);
         case IOReg::LY_REG:
             return ppu->read_ly();
         default:
-            break;
+            return mem[addr];
     }
-    return mem[addr];
 }
 
 void Memory::write(u16 addr, u8 val) {
@@ -193,7 +190,7 @@ void Memory::write(u16 addr, u8 val) {
             return;
         case IOReg::SB_REG:
             printf("%c", val);
-            break;
+            mem[addr] = val;
         case IOReg::SC_REG:
             mem[addr] = (val & (1 << 8)) | 0x7E | (val & 1);
             return;
@@ -207,7 +204,7 @@ void Memory::write(u16 addr, u8 val) {
             return;
         case IOReg::LCDC_REG:
             if ((val & (1 << 7)) == 0) mem[IOReg::LY_REG] = 0;
-            break;
+            mem[addr] = val;
         case IOReg::STAT_REG:
             mem[addr] = 0x80 | (val & 0x78) | (mem[addr] & 0x7);
             ppu->update_stat();
@@ -218,45 +215,32 @@ void Memory::write(u16 addr, u8 val) {
             ppu->update_stat();
             ppu->trigger_stat_intr();
             return;
-        case IOReg::DMA_REG: {
+        case IOReg::DMA_REG:
             if (0xFE <= val && val <= 0xFF) {
                 printf("TODO illegal DMA source value\n");
                 val = mem[addr];
             }
             scheduleDma = true;
             dmaStartAddr = val << 8;
-        } break;
+            mem[addr] = val;
+            return;
         case IOReg::IF_REG:
             mem[addr] = 0xE0 | (val & 0x1F);
             return;
+        default:
+            mem[addr] = val;
     }
-    mem[addr] = val;
 }
 
-void Memory::schedule_read(u8* dest, u16 addr, u8 cycle) {
-    MemoryOp readOp;
-    readOp.cycle = cycle;
-    readOp.isWrite = false;
-    readOp.addr = addr;
-    readOp.readDest = dest;
-    scheduledMemoryOps.push_tail(std::move(readOp));
-}
+void Memory::schedule_read(u16 addr, u8* dest, u8 cycle) { scheduledMemoryOps.push_tail({cycle, addr, false, {dest}}); }
 
-void Memory::schedule_write(u16 addr, u8* val, u8 cycle) {
-    MemoryOp writeOp;
-    writeOp.cycle = cycle;
-    writeOp.isWrite = true;
-    writeOp.addr = addr;
-    writeOp.writeVal = val;
-    scheduledMemoryOps.push_tail(std::move(writeOp));
-}
+void Memory::schedule_write(u16 addr, u8* val, u8 cycle) { scheduledMemoryOps.push_tail({cycle, addr, true, {val}}); }
 
 void Memory::emulate_dma_cycle() {
     if (dmaCycleCnt > 0) {
         if (dmaCycleCnt <= 160) {
             u8 i = 160 - dmaCycleCnt;
             mem[0xFE00 + i] = read(dmaStartAddr + i);
-            // printf("dma...%d\n", i);
             if (i == 0) {
                 oamInaccessible = true;
             }
@@ -279,7 +263,6 @@ void Memory::emulate_cycle() {
             MemoryOp memOp = scheduledMemoryOps.pop_head();
             if (memOp.isWrite) {
                 write(memOp.addr, *memOp.writeVal);
-                // printf("write...\n");
             } else {
                 *memOp.readDest = read(memOp.addr);
             }

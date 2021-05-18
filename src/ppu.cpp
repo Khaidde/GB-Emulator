@@ -3,7 +3,7 @@
 #include "game_boy.hpp"
 
 void PPU::init(Memory* memory) {
-    this->memory = memory;
+    this->mem = memory;
     lcdc = &memory->ref(IOReg::LCDC_REG);
     stat = &memory->ref(IOReg::STAT_REG);
     scy = &memory->ref(IOReg::SCY_REG);
@@ -13,7 +13,7 @@ void PPU::init(Memory* memory) {
     wy = &memory->ref(IOReg::WY_REG);
     wx = &memory->ref(IOReg::WX_REG);
 
-    bufferSel = 0;
+    bufferSel = false;
     for (int i = 0; i < GameBoy::WIDTH * GameBoy::HEIGHT; i++) {
         (frameBuffers[0])[i] = BLANK_COLOR;
         (frameBuffers[1])[i] = BLANK_COLOR;
@@ -34,6 +34,12 @@ void PPU::render(u32* pixelBuffer) {
         pixelBuffer[i] = get_lcdc_flag(LCDCFlag::LCD_ENABLE) ? (*curBuffer)[i] : BLANK_COLOR;
     }
 }
+
+namespace {
+
+u16 get_sprite_addr(u8 index) { return 0xFE00 + (index << 2); }
+
+}  // namespace
 
 extern bool test;
 int cnt = 0;
@@ -77,11 +83,11 @@ void PPU::emulate_clock() {
                 spriteList.clear();
                 for (int i = 0; i < 40; i++) {
                     u16 addr = get_sprite_addr(i);
-                    u8 y = memory->read(addr);
-                    u8 x = memory->read(addr + 1);
+                    u8 y = mem->read(addr);
+                    u8 x = mem->read(addr + 1);
 
                     if (x > 0 && *ly + 16 >= y && *ly + 16 < y + (get_lcdc_flag(LCDCFlag::SPRITE_SIZE) ? 16 : 8)) {
-                        spriteList.add({y, x, memory->read(addr + 2), memory->read(addr + 3)});
+                        spriteList.add({y, x, mem->read(addr + 2), mem->read(addr + 3)});
                         if (spriteList.size == SpriteList::MAX_SPRITES) break;
                     }
                 }
@@ -121,7 +127,7 @@ void PPU::emulate_clock() {
                                     fetcher.doFetch = false;
                                     fetcher.fetchState = Fetcher::READ_TILE_ID;
                                     fetcher.curSprite = sprite;
-                                    spriteList.remove(i--);
+                                    spriteList.remove(i);
                                     break;
                                 }
                             }
@@ -154,7 +160,7 @@ void PPU::emulate_clock() {
                 update_stat();
 
                 if (*ly >= GameBoy::HEIGHT) {
-                    memory->request_interrupt(Interrupt::VBLANK_INT);
+                    mem->request_interrupt(Interrupt::VBLANK_INT);
                     set_mode(V_BLANK);
                 } else {
                     set_mode(OAM_SEARCH);
@@ -202,7 +208,7 @@ void PPU::background_fetch() {
             } else {
                 u8 tileX = (*scx / TILE_PX_SIZE + fetcher.tileX) % TILESET_SIZE;
                 u8 tileY = ((*scy + *ly) / TILE_PX_SIZE) % TILESET_SIZE;
-                tileIndex = memory->read((tileX + tileY * TILESET_SIZE) + tileMap);
+                tileIndex = mem->read((tileX + tileY * TILESET_SIZE) + tileMap);
             }
 
             u8 tileByteOff = ((*ly + *scy) % TILE_PX_SIZE) * 2;
@@ -215,11 +221,11 @@ void PPU::background_fetch() {
             fetcher.fetchState = Fetcher::READ_TILE_0;
         } break;
         case Fetcher::READ_TILE_0:
-            fetcher.data0 = memory->read(fetcher.tileRowAddr);
+            fetcher.data0 = mem->read(fetcher.tileRowAddr);
             fetcher.fetchState = Fetcher::READ_TILE_1;
             break;
         case Fetcher::READ_TILE_1:
-            fetcher.data1 = memory->read(fetcher.tileRowAddr + 1);
+            fetcher.data1 = mem->read(fetcher.tileRowAddr + 1);
             if (pxlFifo.size >= 8) {
                 fetcher.fetchState = Fetcher::PUSH;
             }
@@ -245,7 +251,7 @@ void PPU::background_fetch() {
             break;
         default:
             break;
-    };
+    }
 }
 
 void PPU::sprite_fetch() {
@@ -269,11 +275,11 @@ void PPU::sprite_fetch() {
             fetcher.fetchState = Fetcher::READ_TILE_0;
         } break;
         case Fetcher::READ_TILE_0:
-            fetcher.data0 = memory->read(fetcher.tileRowAddr);
+            fetcher.data0 = mem->read(fetcher.tileRowAddr);
             fetcher.fetchState = Fetcher::READ_TILE_1;
             break;
         case Fetcher::READ_TILE_1:
-            fetcher.data1 = memory->read(fetcher.tileRowAddr + 1);
+            fetcher.data1 = mem->read(fetcher.tileRowAddr + 1);
 
         case Fetcher::PUSH: {
             int xOff = fetcher.curSprite->x < 8 ? 8 - fetcher.curSprite->x : 0;
@@ -310,14 +316,14 @@ void PPU::sprite_fetch() {
 
 bool PPU::get_lcdc_flag(LCDCFlag flag) { return *lcdc & (1 << (u8)flag); }
 
-void PPU::set_mode(Mode mode) {
+void PPU::set_mode(Mode m) {
     // When switching from oam_search to v_blank, momentarily switch to h_blank
-    if (mode == OAM_SEARCH && this->mode == V_BLANK) {
+    if (m == OAM_SEARCH && this->mode == V_BLANK) {
         *stat = (*stat & 0xFC);
     }
     // TODO only delay stat mode change on DMG
     this->modeSwitchClocks = 4;
-    this->mode = mode;
+    this->mode = m;
 }
 
 void PPU::update_stat() {
@@ -341,7 +347,7 @@ void PPU::trigger_stat_intr() {
     if (curCycleStatTrigger) {
         if (!statTrigger) {
             statTrigger = true;
-            memory->request_interrupt(Interrupt::STAT_INT);
+            mem->request_interrupt(Interrupt::STAT_INT);
         }
     } else {
         statTrigger = false;
@@ -354,10 +360,5 @@ u32 PPU::get_color(FIFOData&& data) {
     u8 i = (data.colIndex << 1);
     u8 mask = 3 << i;
 
-    return baseColors[(memory->read(data.palleteAddr) & mask) >> i];
-}
-
-u16 PPU::get_sprite_addr(u8 index) {
-    static constexpr u16 OAM_ADDR = 0xFE00;
-    return OAM_ADDR + (index << 2);
+    return baseColors[(mem->read(data.palleteAddr) & mask) >> i];
 }

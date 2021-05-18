@@ -1,12 +1,12 @@
 #pragma once
 
-#include <stdint.h>
+#include <cstdint>
 #include <stdexcept>
 
 #define fatal(...)                                                                     \
     char buff[0xFF] = "FATAL ERROR: ";                                                 \
     snprintf(buff + 13 * sizeof(char), sizeof(buff) - 13 * sizeof(char), __VA_ARGS__); \
-    throw std::runtime_error(buff);
+    throw std::runtime_error(buff)
 
 using u8 = uint8_t;
 using u16 = uint16_t;
@@ -34,7 +34,6 @@ struct Queue {
         return val;
     }
     T head() { return data[offset]; }
-    T tail() { return data[(offset + size) % capacity]; }
 };
 
 namespace IOReg {
@@ -42,15 +41,15 @@ enum : u16 {
     // I/O registers
     JOYP_REG = 0xFF00,
 
+    // Serial Data Transfer
+    SB_REG = 0xFF01,
+    SC_REG = 0xFF02,
+
     // Timer
     DIV_REG = 0xFF04,
     TIMA_REG = 0xFF05,
     TMA_REG = 0xFF06,
     TAC_REG = 0xFF07,
-
-    // Serial Data Transfer
-    SB_REG = 0xFF01,
-    SC_REG = 0xFF02,
 
     IF_REG = 0xFF0F,
 

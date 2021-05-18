@@ -7,13 +7,13 @@ class Memory;
 class Input {
    public:
     void init(Memory* memory) {
-        this->memory = memory;
-        keystate = 0xFF;
+        this->mem = memory;
+        keyState = 0xFF;
     }
     void handle_input(bool pressed, u8 key);
-    u8 get_key_state(bool btnSelect, bool dirSelect);
+    u8 get_key_state(u8 keyReg);
 
    private:
-    Memory* memory;
-    u8 keystate;
+    Memory* mem;
+    u8 keyState;
 };

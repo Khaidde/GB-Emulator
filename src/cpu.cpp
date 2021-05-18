@@ -3,379 +3,9 @@
 #include <cstdio>
 
 void CPU::init(Memory* memory, Debugger* debugger) {
-    this->memory = memory;
-    this->debugger = debugger;
+    this->mem = memory;
+    this->debug = debugger;
     restart();
-
-    /*
-        opcodes[0x00] = &CPU::op00;
-        opcodes[0x01] = &CPU::op01;
-        opcodes[0x02] = &CPU::op02;
-        opcodes[0x03] = &CPU::op03;
-        opcodes[0x04] = &CPU::op04;
-        opcodes[0x05] = &CPU::op05;
-        opcodes[0x06] = &CPU::op06;
-        opcodes[0x07] = &CPU::op07;
-        opcodes[0x08] = &CPU::op08;
-        opcodes[0x09] = &CPU::op09;
-        opcodes[0x0A] = &CPU::op0A;
-        opcodes[0x0B] = &CPU::op0B;
-        opcodes[0x0C] = &CPU::op0C;
-        opcodes[0x0D] = &CPU::op0D;
-        opcodes[0x0E] = &CPU::op0E;
-        opcodes[0x0F] = &CPU::op0F;
-
-        opcodes[0x10] = &CPU::op10;
-        opcodes[0x11] = &CPU::op11;
-        opcodes[0x12] = &CPU::op12;
-        opcodes[0x13] = &CPU::op13;
-        opcodes[0x14] = &CPU::op14;
-        opcodes[0x15] = &CPU::op15;
-        opcodes[0x16] = &CPU::op16;
-        opcodes[0x17] = &CPU::op17;
-        opcodes[0x18] = &CPU::op18;
-        opcodes[0x19] = &CPU::op19;
-        opcodes[0x1A] = &CPU::op1A;
-        opcodes[0x1B] = &CPU::op1B;
-        opcodes[0x1C] = &CPU::op1C;
-        opcodes[0x1D] = &CPU::op1D;
-        opcodes[0x1E] = &CPU::op1E;
-        opcodes[0x1F] = &CPU::op1F;
-
-        opcodes[0x20] = &CPU::op20;
-        opcodes[0x21] = &CPU::op21;
-        opcodes[0x22] = &CPU::op22;
-        opcodes[0x23] = &CPU::op23;
-        opcodes[0x24] = &CPU::op24;
-        opcodes[0x25] = &CPU::op25;
-        opcodes[0x26] = &CPU::op26;
-        opcodes[0x27] = &CPU::op27;
-        opcodes[0x28] = &CPU::op28;
-        opcodes[0x29] = &CPU::op29;
-        opcodes[0x2A] = &CPU::op2A;
-        opcodes[0x2B] = &CPU::op2B;
-        opcodes[0x2C] = &CPU::op2C;
-        opcodes[0x2D] = &CPU::op2D;
-        opcodes[0x2E] = &CPU::op2E;
-        opcodes[0x2F] = &CPU::op2F;
-
-        opcodes[0x30] = &CPU::op30;
-        opcodes[0x31] = &CPU::op31;
-        opcodes[0x32] = &CPU::op32;
-        opcodes[0x33] = &CPU::op33;
-        opcodes[0x34] = &CPU::op34;
-        opcodes[0x35] = &CPU::op35;
-        opcodes[0x36] = &CPU::op36;
-        opcodes[0x37] = &CPU::op37;
-        opcodes[0x38] = &CPU::op38;
-        opcodes[0x39] = &CPU::op39;
-        opcodes[0x3A] = &CPU::op3A;
-        opcodes[0x3B] = &CPU::op3B;
-        opcodes[0x3C] = &CPU::op3C;
-        opcodes[0x3D] = &CPU::op3D;
-        opcodes[0x3E] = &CPU::op3E;
-        opcodes[0x3F] = &CPU::op3F;
-
-        opcodes[0x40] = &CPU::op40;
-        opcodes[0x41] = &CPU::op41;
-        opcodes[0x42] = &CPU::op42;
-        opcodes[0x43] = &CPU::op43;
-        opcodes[0x44] = &CPU::op44;
-        opcodes[0x45] = &CPU::op45;
-        opcodes[0x46] = &CPU::op46;
-        opcodes[0x47] = &CPU::op47;
-        opcodes[0x48] = &CPU::op48;
-        opcodes[0x49] = &CPU::op49;
-        opcodes[0x4A] = &CPU::op4A;
-        opcodes[0x4B] = &CPU::op4B;
-        opcodes[0x4C] = &CPU::op4C;
-        opcodes[0x4D] = &CPU::op4D;
-        opcodes[0x4E] = &CPU::op4E;
-        opcodes[0x4F] = &CPU::op4F;
-
-        opcodes[0x50] = &CPU::op50;
-        opcodes[0x51] = &CPU::op51;
-        opcodes[0x52] = &CPU::op52;
-        opcodes[0x53] = &CPU::op53;
-        opcodes[0x54] = &CPU::op54;
-        opcodes[0x55] = &CPU::op55;
-        opcodes[0x56] = &CPU::op56;
-        opcodes[0x57] = &CPU::op57;
-        opcodes[0x58] = &CPU::op58;
-        opcodes[0x59] = &CPU::op59;
-        opcodes[0x5A] = &CPU::op5A;
-        opcodes[0x5B] = &CPU::op5B;
-        opcodes[0x5C] = &CPU::op5C;
-        opcodes[0x5D] = &CPU::op5D;
-        opcodes[0x5E] = &CPU::op5E;
-        opcodes[0x5F] = &CPU::op5F;
-
-        opcodes[0x60] = &CPU::op60;
-        opcodes[0x61] = &CPU::op61;
-        opcodes[0x62] = &CPU::op62;
-        opcodes[0x63] = &CPU::op63;
-        opcodes[0x64] = &CPU::op64;
-        opcodes[0x65] = &CPU::op65;
-        opcodes[0x66] = &CPU::op66;
-        opcodes[0x67] = &CPU::op67;
-        opcodes[0x68] = &CPU::op68;
-        opcodes[0x69] = &CPU::op69;
-        opcodes[0x6A] = &CPU::op6A;
-        opcodes[0x6B] = &CPU::op6B;
-        opcodes[0x6C] = &CPU::op6C;
-        opcodes[0x6D] = &CPU::op6D;
-        opcodes[0x6E] = &CPU::op6E;
-        opcodes[0x6F] = &CPU::op6F;
-
-        opcodes[0x70] = &CPU::op70;
-        opcodes[0x71] = &CPU::op71;
-        opcodes[0x72] = &CPU::op72;
-        opcodes[0x73] = &CPU::op73;
-        opcodes[0x74] = &CPU::op74;
-        opcodes[0x75] = &CPU::op75;
-        opcodes[0x76] = &CPU::op76;
-        opcodes[0x77] = &CPU::op77;
-        opcodes[0x78] = &CPU::op78;
-        opcodes[0x79] = &CPU::op79;
-        opcodes[0x7A] = &CPU::op7A;
-        opcodes[0x7B] = &CPU::op7B;
-        opcodes[0x7C] = &CPU::op7C;
-        opcodes[0x7D] = &CPU::op7D;
-        opcodes[0x7E] = &CPU::op7E;
-        opcodes[0x7F] = &CPU::op7F;
-
-        opcodes[0x80] = &CPU::op80;
-        opcodes[0x81] = &CPU::op81;
-        opcodes[0x82] = &CPU::op82;
-        opcodes[0x83] = &CPU::op83;
-        opcodes[0x84] = &CPU::op84;
-        opcodes[0x85] = &CPU::op85;
-        opcodes[0x86] = &CPU::op86;
-        opcodes[0x87] = &CPU::op87;
-        opcodes[0x88] = &CPU::op88;
-        opcodes[0x89] = &CPU::op89;
-        opcodes[0x8A] = &CPU::op8A;
-        opcodes[0x8B] = &CPU::op8B;
-        opcodes[0x8C] = &CPU::op8C;
-        opcodes[0x8D] = &CPU::op8D;
-        opcodes[0x8E] = &CPU::op8E;
-        opcodes[0x8F] = &CPU::op8F;
-
-        opcodes[0x90] = &CPU::op90;
-        opcodes[0x91] = &CPU::op91;
-        opcodes[0x92] = &CPU::op92;
-        opcodes[0x93] = &CPU::op93;
-        opcodes[0x94] = &CPU::op94;
-        opcodes[0x95] = &CPU::op95;
-        opcodes[0x96] = &CPU::op96;
-        opcodes[0x97] = &CPU::op97;
-        opcodes[0x98] = &CPU::op98;
-        opcodes[0x99] = &CPU::op99;
-        opcodes[0x9A] = &CPU::op9A;
-        opcodes[0x9B] = &CPU::op9B;
-        opcodes[0x9C] = &CPU::op9C;
-        opcodes[0x9D] = &CPU::op9D;
-        opcodes[0x9E] = &CPU::op9E;
-        opcodes[0x9F] = &CPU::op9F;
-
-        opcodes[0xA0] = &CPU::opA0;
-        opcodes[0xA1] = &CPU::opA1;
-        opcodes[0xA2] = &CPU::opA2;
-        opcodes[0xA3] = &CPU::opA3;
-        opcodes[0xA4] = &CPU::opA4;
-        opcodes[0xA5] = &CPU::opA5;
-        opcodes[0xA6] = &CPU::opA6;
-        opcodes[0xA7] = &CPU::opA7;
-        opcodes[0xA8] = &CPU::opA8;
-        opcodes[0xA9] = &CPU::opA9;
-        opcodes[0xAA] = &CPU::opAA;
-        opcodes[0xAB] = &CPU::opAB;
-        opcodes[0xAC] = &CPU::opAC;
-        opcodes[0xAD] = &CPU::opAD;
-        opcodes[0xAE] = &CPU::opAE;
-        opcodes[0xAF] = &CPU::opAF;
-
-        opcodes[0xB0] = &CPU::opB0;
-        opcodes[0xB1] = &CPU::opB1;
-        opcodes[0xB2] = &CPU::opB2;
-        opcodes[0xB3] = &CPU::opB3;
-        opcodes[0xB4] = &CPU::opB4;
-        opcodes[0xB5] = &CPU::opB5;
-        opcodes[0xB6] = &CPU::opB6;
-        opcodes[0xB7] = &CPU::opB7;
-        opcodes[0xB8] = &CPU::opB8;
-        opcodes[0xB9] = &CPU::opB9;
-        opcodes[0xBA] = &CPU::opBA;
-        opcodes[0xBB] = &CPU::opBB;
-        opcodes[0xBC] = &CPU::opBC;
-        opcodes[0xBD] = &CPU::opBD;
-        opcodes[0xBE] = &CPU::opBE;
-        opcodes[0xBF] = &CPU::opBF;
-
-        opcodes[0xC0] = &CPU::opC0;
-        opcodes[0xC1] = &CPU::opC1;
-        opcodes[0xC2] = &CPU::opC2;
-        opcodes[0xC3] = &CPU::opC3;
-        opcodes[0xC4] = &CPU::opC4;
-        opcodes[0xC5] = &CPU::opC5;
-        opcodes[0xC6] = &CPU::opC6;
-        opcodes[0xC7] = &CPU::opC7;
-        opcodes[0xC8] = &CPU::opC8;
-        opcodes[0xC9] = &CPU::opC9;
-        opcodes[0xCA] = &CPU::opCA;
-        opcodes[0xCB] = &CPU::opCB;
-        opcodes[0xCC] = &CPU::opCC;
-        opcodes[0xCD] = &CPU::opCD;
-        opcodes[0xCE] = &CPU::opCE;
-        opcodes[0xCF] = &CPU::opCF;
-
-        opcodes[0xD0] = &CPU::opD0;
-        opcodes[0xD1] = &CPU::opD1;
-        opcodes[0xD2] = &CPU::opD2;
-        opcodes[0xD3] = &CPU::opD3;
-        opcodes[0xD4] = &CPU::opD4;
-        opcodes[0xD5] = &CPU::opD5;
-        opcodes[0xD6] = &CPU::opD6;
-        opcodes[0xD7] = &CPU::opD7;
-        opcodes[0xD8] = &CPU::opD8;
-        opcodes[0xD9] = &CPU::opD9;
-        opcodes[0xDA] = &CPU::opDA;
-        opcodes[0xDB] = &CPU::opDB;
-        opcodes[0xDC] = &CPU::opDC;
-        opcodes[0xDD] = &CPU::opDD;
-        opcodes[0xDE] = &CPU::opDE;
-        opcodes[0xDF] = &CPU::opDF;
-
-        opcodes[0xE0] = &CPU::opE0;
-        opcodes[0xE1] = &CPU::opE1;
-        opcodes[0xE2] = &CPU::opE2;
-        opcodes[0xE3] = &CPU::opE3;
-        opcodes[0xE4] = &CPU::opE4;
-        opcodes[0xE5] = &CPU::opE5;
-        opcodes[0xE6] = &CPU::opE6;
-        opcodes[0xE7] = &CPU::opE7;
-        opcodes[0xE8] = &CPU::opE8;
-        opcodes[0xE9] = &CPU::opE9;
-        opcodes[0xEA] = &CPU::opEA;
-        opcodes[0xEB] = &CPU::opEB;
-        opcodes[0xEC] = &CPU::opEC;
-        opcodes[0xED] = &CPU::opED;
-        opcodes[0xEE] = &CPU::opEE;
-        opcodes[0xEF] = &CPU::opEF;
-
-        opcodes[0xF0] = &CPU::opF0;
-        opcodes[0xF1] = &CPU::opF1;
-        opcodes[0xF2] = &CPU::opF2;
-        opcodes[0xF3] = &CPU::opF3;
-        opcodes[0xF4] = &CPU::opF4;
-        opcodes[0xF5] = &CPU::opF5;
-        opcodes[0xF6] = &CPU::opF6;
-        opcodes[0xF7] = &CPU::opF7;
-        opcodes[0xF8] = &CPU::opF8;
-        opcodes[0xF9] = &CPU::opF9;
-        opcodes[0xFA] = &CPU::opFA;
-        opcodes[0xFB] = &CPU::opFB;
-        opcodes[0xFC] = &CPU::opFC;
-        opcodes[0xFD] = &CPU::opFD;
-        opcodes[0xFE] = &CPU::opFE;
-        opcodes[0xFF] = &CPU::opFF;
-
-    // CB Opcodes
-    opcodesCB[0x00] = &CPU::opCB00;
-    opcodesCB[0x01] = &CPU::opCB01;
-    opcodesCB[0x02] = &CPU::opCB02;
-    opcodesCB[0x03] = &CPU::opCB03;
-    opcodesCB[0x04] = &CPU::opCB04;
-    opcodesCB[0x05] = &CPU::opCB05;
-    opcodesCB[0x06] = &CPU::opCB06;
-    opcodesCB[0x07] = &CPU::opCB07;
-    opcodesCB[0x08] = &CPU::opCB08;
-    opcodesCB[0x09] = &CPU::opCB09;
-    opcodesCB[0x0A] = &CPU::opCB0A;
-    opcodesCB[0x0B] = &CPU::opCB0B;
-    opcodesCB[0x0C] = &CPU::opCB0C;
-    opcodesCB[0x0D] = &CPU::opCB0D;
-    opcodesCB[0x0E] = &CPU::opCB0E;
-    opcodesCB[0x0F] = &CPU::opCB0F;
-
-    opcodesCB[0x10] = &CPU::opCB10;
-    opcodesCB[0x11] = &CPU::opCB11;
-    opcodesCB[0x12] = &CPU::opCB12;
-    opcodesCB[0x13] = &CPU::opCB13;
-    opcodesCB[0x14] = &CPU::opCB14;
-    opcodesCB[0x15] = &CPU::opCB15;
-    opcodesCB[0x16] = &CPU::opCB16;
-    opcodesCB[0x17] = &CPU::opCB17;
-    opcodesCB[0x18] = &CPU::opCB18;
-    opcodesCB[0x19] = &CPU::opCB19;
-    opcodesCB[0x1A] = &CPU::opCB1A;
-    opcodesCB[0x1B] = &CPU::opCB1B;
-    opcodesCB[0x1C] = &CPU::opCB1C;
-    opcodesCB[0x1D] = &CPU::opCB1D;
-    opcodesCB[0x1E] = &CPU::opCB1E;
-    opcodesCB[0x1F] = &CPU::opCB1F;
-
-    opcodesCB[0x20] = &CPU::opCB20;
-    opcodesCB[0x21] = &CPU::opCB21;
-    opcodesCB[0x22] = &CPU::opCB22;
-    opcodesCB[0x23] = &CPU::opCB23;
-    opcodesCB[0x24] = &CPU::opCB24;
-    opcodesCB[0x25] = &CPU::opCB25;
-    opcodesCB[0x26] = &CPU::opCB26;
-    opcodesCB[0x27] = &CPU::opCB27;
-    opcodesCB[0x28] = &CPU::opCB28;
-    opcodesCB[0x29] = &CPU::opCB29;
-    opcodesCB[0x2A] = &CPU::opCB2A;
-    opcodesCB[0x2B] = &CPU::opCB2B;
-    opcodesCB[0x2C] = &CPU::opCB2C;
-    opcodesCB[0x2D] = &CPU::opCB2D;
-    opcodesCB[0x2E] = &CPU::opCB2E;
-    opcodesCB[0x2F] = &CPU::opCB2F;
-
-    opcodesCB[0x30] = &CPU::opCB30;
-    opcodesCB[0x31] = &CPU::opCB31;
-    opcodesCB[0x32] = &CPU::opCB32;
-    opcodesCB[0x33] = &CPU::opCB33;
-    opcodesCB[0x34] = &CPU::opCB34;
-    opcodesCB[0x35] = &CPU::opCB35;
-    opcodesCB[0x36] = &CPU::opCB36;
-    opcodesCB[0x37] = &CPU::opCB37;
-    opcodesCB[0x38] = &CPU::opCB38;
-    opcodesCB[0x39] = &CPU::opCB39;
-    opcodesCB[0x3A] = &CPU::opCB3A;
-    opcodesCB[0x3B] = &CPU::opCB3B;
-    opcodesCB[0x3C] = &CPU::opCB3C;
-    opcodesCB[0x3D] = &CPU::opCB3D;
-    opcodesCB[0x3E] = &CPU::opCB3E;
-    opcodesCB[0x3F] = &CPU::opCB3F;
-
-    bitOpcodesCB[0x00] = opCB_bitB;
-    bitOpcodesCB[0x01] = opCB_bitC;
-    bitOpcodesCB[0x02] = opCB_bitD;
-    bitOpcodesCB[0x03] = opCB_bitE;
-    bitOpcodesCB[0x04] = opCB_bitH;
-    bitOpcodesCB[0x05] = opCB_bitL;
-    bitOpcodesCB[0x06] = opCB_bitHL;
-    bitOpcodesCB[0x07] = opCB_bitA;
-
-    bitOpcodesCB[0x08] = opCB_resB;
-    bitOpcodesCB[0x09] = opCB_resC;
-    bitOpcodesCB[0x0A] = opCB_resD;
-    bitOpcodesCB[0x0B] = opCB_resE;
-    bitOpcodesCB[0x0C] = opCB_resH;
-    bitOpcodesCB[0x0D] = opCB_resL;
-    bitOpcodesCB[0x0E] = opCB_resHL;
-    bitOpcodesCB[0x0F] = opCB_resA;
-
-    bitOpcodesCB[0x10] = opCB_setB;
-    bitOpcodesCB[0x11] = opCB_setC;
-    bitOpcodesCB[0x12] = opCB_setD;
-    bitOpcodesCB[0x13] = opCB_setE;
-    bitOpcodesCB[0x14] = opCB_setH;
-    bitOpcodesCB[0x15] = opCB_setL;
-    bitOpcodesCB[0x16] = opCB_setHL;
-    bitOpcodesCB[0x17] = opCB_setA;
-    */
 }
 
 void CPU::restart() {
@@ -392,15 +22,15 @@ void CPU::restart() {
 
     cycleCnt = 0;
 
-    readCycle = 0;
+    callbackCycle = 0;
 }
 
 bool test = false;
 extern u8 cnt;
 void CPU::handle_interrupts() {
     // TODO handle weird push to IE case
-    u8 ifReg = memory->read(IOReg::IF_REG);
-    u8 interrupts = ifReg & memory->read(IOReg::IE_REG) & 0x1F;
+    u8 ifReg = mem->read(IOReg::IF_REG);
+    u8 interrupts = ifReg & mem->read(IOReg::IE_REG) & 0x1F;
     if (interrupts) {
         // TODO only add extra cycle if emulating CGB
         // if (halted) cycleAcc++;  // Extra cycle if cpu is in halt mode
@@ -408,8 +38,10 @@ void CPU::handle_interrupts() {
         if (ime) {
             for (int i = 0; i < 5; i++) {
                 if (interrupts & (1 << i)) {
-                    // printf("Interrupt! %02x from %02x\n", i * 0x8 + 0x40, PC);
-                    call(i * 0x8 + 0x40);
+                    printf("Interrupt! %02x from %02x\n", i * 0x8 + 0x40, PC);
+                    push(PC);
+                    PC = i * 0x8 + 0x40;
+
                     ime = false;
                     write(IOReg::IF_REG, ifReg & ~(1 << i));
 
@@ -430,10 +62,10 @@ bool CPU::isFetching() { return cycleCnt == 0; }
 
 void CPU::emulate_cycle() {
     if (isFetching()) {
-        if (debugger->is_paused()) {
-            debugger->print_instr();
+        if (debug->is_paused()) {
+            debug->print_instr();
         }
-        debugger->update_instr(PC);
+        debug->update_instr(PC);
 
         if (test) printf("cc=%d PC=%02x\n", cnt + 2, PC);
 
@@ -442,7 +74,7 @@ void CPU::emulate_cycle() {
         }
 
         u8 op = n();
-        if (debugger->is_paused()) {
+        if (debug->is_paused()) {
             printf("fetch--%04x-%02x\n", PC - 1, op);
         }
 
@@ -468,10 +100,10 @@ void CPU::emulate_cycle() {
         }
     }
 
-    if (readCycle > 0) {
-        readCycle--;
-        if (readCycle == 0) {
-            readCallback(this);
+    if (callbackCycle > 0) {
+        callbackCycle--;
+        if (callbackCycle == 0) {
+            callback(this);
         }
     }
 }
@@ -487,7 +119,7 @@ void CPU::execute(u8 opcode) {
             PC++;  // Stop instruction will skip the immediate next byte
             break; // STOP
         case 0x76: { // HALT
-            u8 interrupts = memory->read(IOReg::IF_REG) & memory->read(IOReg::IE_REG) & 0x1F;
+            bool interrupts = mem->read(IOReg::IF_REG) & mem->read(IOReg::IE_REG) & 0x1F;
             halted = ime || !interrupts;
             if (!halted) haltBug = true;
         } break;
@@ -588,12 +220,12 @@ void CPU::execute(u8 opcode) {
         case 0x7F: break;                        // LD A, A
         // load 0xFF00
         case 0xE0: skd_write(0xFF00 + n(), AF.hi); break; // LDH (n), A
-        case 0xF0: skd_read(AF.hi, 0xFF00 + n()); break;  // LDH A, (n)
+        case 0xF0: skd_read(0xFF00 + n(), AF.hi); break;  // LDH A, (n)
         case 0xE2: write(BC.lo + 0xFF00, AF.hi); break;   // LDH (C), A
         case 0xF2: AF.hi = read(BC.lo + 0xFF00); break;   // LDH A, (C)
         // 16-bit memory load
         case 0xEA: skd_write(nn(), AF.hi); break; // LD (nn), A
-        case 0xFA: skd_read(AF.hi, nn()); break;  // LD A, (nn)
+        case 0xFA: skd_read(nn(), AF.hi); break;  // LD A, (nn)
         // LD reg16, nn
         case 0x01: BC.pair = nn(); break; // LD BC, nn
         case 0x11: DE.pair = nn(); break; // LD DE, nn
@@ -605,7 +237,7 @@ void CPU::execute(u8 opcode) {
         case 0xE1: pop(HL.pair); break; // POP HL
         case 0xF1: 
             AF.lo = (read(SP++) & 0xF0) | (AF.lo & 0xF);
-            skd_read(AF.hi, SP++);
+            skd_read(SP++, AF.hi);
             break; // POP AF
         // PUSH reg16
         case 0xC5: push(BC.pair); break; // PUSH BC
@@ -767,31 +399,31 @@ void CPU::execute(u8 opcode) {
             set_flag(C_FLAG, !check_flag(C_FLAG));
             break; // CCF
         // JP
-        case 0xC3: jump(nn()); break; // JP nn
+        case 0xC3: jump_nn(); break; // JP nn
         case 0xC2:
             if (!check_flag(Z_FLAG)) {
-                jump(nn());
+                jump_nn();
             } else {
                 nn();
             }
             break; // JP NZ, nn
         case 0xD2:
             if (!check_flag(C_FLAG)) {
-                jump(nn());
+                jump_nn();
             } else {
                 nn();
             }
             break; // JP NC, nn
         case 0xCA:
             if (check_flag(Z_FLAG)) {
-                jump(nn());
+                jump_nn();
             } else {
                 nn();
             }
             break; // JP Z, nn
         case 0xDA:
             if (check_flag(C_FLAG)) {
-                jump(nn());
+                jump_nn();
             } else {
                 nn();
             }
@@ -800,98 +432,107 @@ void CPU::execute(u8 opcode) {
         // JR
         case 0x18: {
             s8 off = n();
-            jump(PC + off);
+            PC += off;
+            cycleCnt++;
         } break; // JR n
         case 0x20: {
             s8 off = n();
             if (!check_flag(Z_FLAG)) {
-                jump(PC + off);
+                PC += off;
+                cycleCnt++;
             }
         } break; // JR NZ, n
         case 0x30: {
             s8 off = n();
             if (!check_flag(C_FLAG)) {
-                jump(PC + off);
+                PC += off;
+                cycleCnt++;
             }
         } break; // JR NC, n
         case 0x28: {
             s8 off = n();
             if (check_flag(Z_FLAG)) {
-                jump(PC + off);
+                PC += off;
+                cycleCnt++;
             }
         } break; // JR Z, n
         case 0x38: {
             s8 off = n();
             if (check_flag(C_FLAG)) {
-                jump(PC + off);
+                PC += off;
+                cycleCnt++;
             }
         } break; // JR C, n
         // CALL
-        case 0xCD: call(nn()); break; // CALL
+        case 0xCD: call_nn(); break; // CALL
         case 0xC4:
             if (!check_flag(Z_FLAG)) {
-                call(nn());
+                call_nn();
             } else {
                 nn();
             }
             break; // CALL NZ, nn
         case 0xD4:
             if (!check_flag(C_FLAG)) {
-                call(nn());
+                call_nn();
             } else {
                 nn();
             }
             break; // CALL NC, nn
         case 0xCC:
             if (check_flag(Z_FLAG)) {
-                call(nn());
+                call_nn();
             } else {
                 nn();
             }
             break; // CALL Z, nn
         case 0xDC:
             if (check_flag(C_FLAG)) {
-                call(nn());
+                call_nn();
             } else {
                 nn();
             }
             break; // CALL C, nn
         // RST
-        case 0xC7: call(0x00); break; // RST 00H
-        case 0xCF: call(0x08); break; // RST 08H
-        case 0xD7: call(0x10); break; // RST 10H
-        case 0xDF: call(0x18); break; // RST 18H
-        case 0xE7: call(0x20); break; // RST 20H
-        case 0xEF: call(0x28); break; // RST 28H
-        case 0xF7: call(0x30); break; // RST 30H
-        case 0xFF: call(0x38); break; // RST 38H
+        case 0xC7: rst(0x00); break; // RST 00H
+        case 0xCF: rst(0x08); break; // RST 08H
+        case 0xD7: rst(0x10); break; // RST 10H
+        case 0xDF: rst(0x18); break; // RST 18H
+        case 0xE7: rst(0x20); break; // RST 20H
+        case 0xEF: rst(0x28); break; // RST 28H
+        case 0xF7: rst(0x30); break; // RST 30H
+        case 0xFF: rst(0x38); break; // RST 38H
         // RET
-        case 0xC9: jump(pop2()); break; // RET
+        case 0xC9: pop(PC); cycleCnt++; break; // RET
         case 0xC0:
             cycleCnt++;
             if (!check_flag(Z_FLAG)) {
-                jump(pop2());
+                pop(PC);
+                cycleCnt++;
             }
             break; // RET NZ
         case 0xD0:
             cycleCnt++;
             if (!check_flag(C_FLAG)) {
-                jump(pop2());
+                pop(PC);
+                cycleCnt++;
             }
             break; // RET NC
         case 0xC8:
             cycleCnt++;
             if (check_flag(Z_FLAG)) {
-                jump(pop2());
+                pop(PC);
+                cycleCnt++;
             }
             break; // RET Z
         case 0xD8:
             cycleCnt++;
             if (check_flag(C_FLAG)) {
-                jump(pop2());
+                pop(PC);
+                cycleCnt++;
             }
             break; // RET C
-        case 0xD9: jump(pop2()); ime = true; break; // RETI
+        case 0xD9: pop(PC); cycleCnt++; ime = true; break; // RETI
         // CB
         case 0xCB: execute_cb(); break;
         // Error
@@ -923,7 +564,7 @@ void CPU::execute_cb() {
             case 0x04: rlc8(HL.hi); break; // RLC H
             case 0x05: rlc8(HL.lo); break; // RLC L
             case 0x06:
-                skd_read(temp8, HL.pair, [](CPU* c) { c->rlc8(c->temp8); });
+                skd_read(HL.pair, temp8, [](CPU* c) { c->rlc8(c->temp8); });
                 skd_write(HL.pair, temp8);
                 break; // RLC (HL)
             case 0x07: rlc8(AF.hi); break; // RLC A
@@ -935,7 +576,7 @@ void CPU::execute_cb() {
             case 0x0C: rrc8(HL.hi); break; // RRC H
             case 0x0D: rrc8(HL.lo); break; // RRC L
             case 0x0E:
-                skd_read(temp8, HL.pair, [](CPU* c) { c->rrc8(c->temp8); });
+                skd_read(HL.pair, temp8, [](CPU* c) { c->rrc8(c->temp8); });
                 skd_write(HL.pair, temp8);
                 break;  // RRC (HL)
             case 0x0F: rrc8(AF.hi); break; // RRC A
@@ -947,7 +588,7 @@ void CPU::execute_cb() {
             case 0x14: rl8(HL.hi); break; // RL H
             case 0x15: rl8(HL.lo); break; // RL L
             case 0x16:
-                skd_read(temp8, HL.pair, [](CPU* c) { c->rl8(c->temp8); });
+                skd_read(HL.pair, temp8, [](CPU* c) { c->rl8(c->temp8); });
                 skd_write(HL.pair, temp8);
                 break; // RL (HL)
             case 0x17: rl8(AF.hi); break; // RL A
@@ -959,7 +600,7 @@ void CPU::execute_cb() {
             case 0x1C: rr8(HL.hi); break; // RR H
             case 0x1D: rr8(HL.lo); break; // RR L
             case 0x1E:
-                skd_read(temp8, HL.pair, [](CPU* c) { c->rr8(c->temp8); });
+                skd_read(HL.pair, temp8, [](CPU* c) { c->rr8(c->temp8); });
                 skd_write(HL.pair, temp8);
                 break; // RR (HL)
             case 0x1F: rr8(AF.hi); break; // RR A
@@ -971,7 +612,7 @@ void CPU::execute_cb() {
             case 0x24: sla8(HL.hi); break; // SLA H
             case 0x25: sla8(HL.lo); break; // SLA L
             case 0x26:
-                skd_read(temp8, HL.pair, [](CPU* c) { c->sla8(c->temp8); });
+                skd_read(HL.pair, temp8, [](CPU* c) { c->sla8(c->temp8); });
                 skd_write(HL.pair, temp8);
                 break; // SLA (HL)
             case 0x27: sla8(AF.hi); break; // SLA A
@@ -983,7 +624,7 @@ void CPU::execute_cb() {
             case 0x2C: sra8(HL.hi); break; // SRA H
             case 0x2D: sra8(HL.lo); break; // SRA L
             case 0x2E:
-                skd_read(temp8, HL.pair, [](CPU* c) { c->sra8(c->temp8); });
+                skd_read(HL.pair, temp8, [](CPU* c) { c->sra8(c->temp8); });
                 skd_write(HL.pair, temp8);
                 break; // SRA (HL)
             case 0x2F: sra8(AF.hi); break; // SRA A
@@ -995,7 +636,7 @@ void CPU::execute_cb() {
             case 0x34: swap(HL.hi); break; // SWAP H
             case 0x35: swap(HL.lo); break; // SWAP L
             case 0x36:
-                skd_read(temp8, HL.pair, [](CPU* c) { c->swap(c->temp8); });
+                skd_read(HL.pair, temp8, [](CPU* c) { c->swap(c->temp8); });
                 skd_write(HL.pair, temp8);
                 break; // SWAP (HL)
             case 0x37: swap(AF.hi); break; // SWAP A
@@ -1007,7 +648,7 @@ void CPU::execute_cb() {
             case 0x3C: srl8(HL.hi); break; // SRL H
             case 0x3D: srl8(HL.lo); break; // SRL L
             case 0x3E:
-                skd_read(temp8, HL.pair, [](CPU* c) { c->srl8(c->temp8); });
+                skd_read(HL.pair, temp8, [](CPU* c) { c->srl8(c->temp8); });
                 skd_write(HL.pair, temp8);
                 break; // SRL (HL)
             case 0x3F: srl8(AF.hi); break; // SRL A
@@ -1025,7 +666,7 @@ void CPU::execute_cb() {
             case 0x03: bit(DE.lo); break; // BIT b, E
             case 0x04: bit(HL.hi); break; // BIT b, H
             case 0x05: bit(HL.lo); break; // BIT b, L
-            case 0x06: skd_read(temp8, HL.pair, [](CPU* c) { c->bit(c->temp8); }); break; // BIT b, (HL)
+            case 0x06: skd_read(HL.pair, temp8, [](CPU* c) { c->bit(c->temp8); }); break; // BIT b, (HL)
             case 0x07: bit(AF.hi); break; // BIT b, A
             // RES
             case 0x08: res(BC.hi); break; // RES b, B
@@ -1035,7 +676,7 @@ void CPU::execute_cb() {
             case 0x0C: res(HL.hi); break; // RES b, H
             case 0x0D: res(HL.lo); break; // RES b, L
             case 0x0E:
-                skd_read(temp8, HL.pair, [](CPU* c) { c->res(c->temp8); });
+                skd_read(HL.pair, temp8, [](CPU* c) { c->res(c->temp8); });
                 skd_write(HL.pair, temp8);
                 break; // RES b, (HL)
             case 0x0F: res(AF.hi); break; // RES b, A
@@ -1047,7 +688,7 @@ void CPU::execute_cb() {
             case 0x14: set(HL.hi); break; // SET b, H
             case 0x15: set(HL.lo); break; // SET b, L
             case 0x16:
-                skd_read(temp8, HL.pair, [](CPU* c) { c->set(c->temp8); });
+                skd_read(HL.pair, temp8, [](CPU* c) { c->set(c->temp8); });
                 skd_write(HL.pair, temp8);
                 break; // SET b, (HL)
             case 0x17: set(AF.hi); break; // SET b, A
@@ -1061,7 +702,7 @@ void CPU::execute_cb() {
 void CPU::set_flag(u8 flag, bool set) { AF.lo = (AF.lo & ~flag) | (flag * set); }
 bool CPU::check_flag(u8 flag) { return (AF.lo & flag) != 0; }
 u8 CPU::n() {
-    debugger->inc_instr_bytes();
+    debug->inc_instr_bytes();
     return read(PC++);
 }
 u16 CPU::nn() {
@@ -1069,38 +710,35 @@ u16 CPU::nn() {
     PC++;
     res |= read(PC) << 8;
     PC++;
-    debugger->inc_instr_bytes();
-    debugger->inc_instr_bytes();
+    debug->inc_instr_bytes();
+    debug->inc_instr_bytes();
     return res;
 }
 u8 CPU::read(u16 addr) {
     cycleCnt++;
-    return memory->read(addr);
+    return mem->read(addr);
 }
 void CPU::write(u16 addr, u8 val) {
     cycleCnt++;
-    memory->write(addr, val);
+    mem->write(addr, val);
 }
-void CPU::skd_read(u8& dest, u16 addr, ReadCallback&& callback) {
-    skd_read(dest, addr);
-    readCycle = cycleCnt;
-    readCallback = callback;
+void CPU::skd_read(u16 addr, u8& dest, Callback&& readCallback) {
+    skd_read(addr, dest);
+    callbackCycle = cycleCnt;
+    callback = readCallback;
 }
-void CPU::skd_read(u8& dest, u16 addr) {
-    memory->schedule_read(&dest, addr, cycleCnt);
+void CPU::skd_read(u16 addr, u8& dest) {
+    mem->schedule_read(addr, &dest, cycleCnt);
     cycleCnt++;
 }
 void CPU::skd_write(u16 addr, u8& val) {
-    memory->schedule_write(addr, &val, cycleCnt);
+    mem->schedule_write(addr, &val, cycleCnt);
     cycleCnt++;
 }
 
 void CPU::pop(u16& dest) {
-    *((u8*)&dest) = read(SP++);
-
-    static u8* popHi;
-    popHi = ((u8*)&dest) + 1;
-    skd_read(*popHi, SP++);
+    skd_read(SP++, *((u8*)&dest));
+    skd_read(SP++, *((u8*)&dest + 1));
 }
 
 void CPU::push(u16 reg) {
@@ -1241,27 +879,30 @@ void CPU::daa() {
     set_flag(H_FLAG, false);
 }
 
-void CPU::jump(u16 addr) {
-    PC = addr;
+void CPU::jump_nn() {
+    skd_read(PC, *((u8*)&PC));
+    PC++;
+    skd_read(PC, *((u8*)&PC + 1));
+    PC++;
     cycleCnt++;
 }
 
-void CPU::call(u16 addr) {
+void CPU::call_nn() {
+    skd_read(PC, *((u8*)&PC));
+    PC++;
+    skd_read(PC, *((u8*)&PC + 1));
+    PC++;
+    push(PC);
+}
+
+void CPU::rst(u16 addr) {
     push(PC);
     PC = addr;
 }
 
-u16 CPU::pop2() {
-    u16 res = read(SP);
-    SP++;
-    res |= read(SP) << 8;
-    SP++;
-    return res;
-}
-
 void CPU::freeze() {
     printf("Invalid opcode, freezing...\n");
-    debugger->pause_exec();
+    debug->pause_exec();
 }
 
 void CPU::rlc8(u8& reg) {
@@ -1319,9 +960,9 @@ void CPU::sra8(u8& reg) {
 void CPU::swap(u8& reg) {
     reg = ((reg & 0xF) << 4) | (reg >> 4);
     set_flag(Z_FLAG, reg == 0);
-    set_flag(N_FLAG, 0);
-    set_flag(H_FLAG, 0);
-    set_flag(C_FLAG, 0);
+    set_flag(N_FLAG, false);
+    set_flag(H_FLAG, false);
+    set_flag(C_FLAG, false);
 }
 
 void CPU::srl8(u8& reg) {

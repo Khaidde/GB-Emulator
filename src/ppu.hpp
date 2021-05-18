@@ -14,7 +14,7 @@ struct Sprite {
 struct SpriteList {
     static constexpr u8 MAX_SPRITES = 10;
     Sprite data[MAX_SPRITES];
-    u16 removedBitField;
+    u16 removedBitField = 0;
     u8 size = 0;
 
     void clear() {
@@ -65,7 +65,7 @@ class PPU {
     u8 read_ly();
 
    private:
-    Memory* memory;
+    Memory* mem;
 
     u8* lcdc;
     u8* stat;
@@ -113,13 +113,6 @@ class PPU {
         LCD_ENABLE = 7,
     };
 
-    enum class STATIntrFlag : char {
-        LYC_LY_INTR = 6,
-        MODE_2_INTR = 5,
-        MODE_1_INTR = 4,
-        MODE_0_INTR = 3,
-    };
-
     enum Mode : u8 {
         H_BLANK = 0,
         V_BLANK = 1,
@@ -130,7 +123,13 @@ class PPU {
     bool curCycleStatTrigger;
     int modeSwitchClocks;
 
-    const u32 baseColors[4] = {0xFFFFF6D3, 0xFFF9A875, 0xFFEB6B6F, 0xFF7C3F58};
+    // ICE_CREAM_GB const u32 baseColors[4] = {0xFFFFF6D3, 0xFFF9A875, 0xFFEB6B6F, 0xFF7C3F58};
+    // COLD_FIRE_GB const u32 baseColors[4] = {0xFFF6C6A8, 0xFFD17C7C, 0xFF5B768D, 0xFF46425E};
+    // SEA_SALT_ICE_CREAM const u32 baseColors[4] = {0xFFFFF6D3, 0xFF8BE6FF, 0xFF608ECF, 0xFF3336E8};
+    // MIST_GB const u32 baseColors[4] = {0xFFC4F0C2, 0xFF5AB9A8, 0xFF1E606E, 0xFF2D1B00};
+    // CANDYPOP const u32 baseColors[4] = {0xFFEEBFF5, 0xFF9E81D0, 0xFF854576, 0xFF301221};
+    // CAVE4
+    const u32 baseColors[4] = {0xFFE4CBBF, 0xFF938282, 0xFF4F4E80, 0xFF2C0016};
     const u32 BLANK_COLOR = 0xFF101010;
 
     void background_fetch();
@@ -138,9 +137,7 @@ class PPU {
 
     bool get_lcdc_flag(LCDCFlag flag);
 
-    void set_mode(Mode mode);
+    void set_mode(Mode m);
 
     u32 get_color(FIFOData&& data);
-
-    u16 get_sprite_addr(u8 index);
 };

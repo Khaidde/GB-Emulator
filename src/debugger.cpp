@@ -1,8 +1,8 @@
 #include "debugger.hpp"
 
-void Debugger::init(CPU* cpu, Memory* memory) {
-    this->cpu = cpu;
-    this->memory = memory;
+void Debugger::init(CPU* c, Memory* memory) {
+    this->cpu = c;
+    this->mem = memory;
 
     stepCnt = 0;
     pause = false;
@@ -14,14 +14,14 @@ void Debugger::update_instr(u16 opPC) {
 }
 
 void Debugger::print_reg(u16 address, const char* name) {
-    printf("\t%2.4x: %02x (%s)\n", address, memory->read(address), name);
+    printf("\t%2.4x: %02x (%s)\n", address, mem->read(address), name);
 }
 
 void Debugger::print_instr() {
     /*
-    printf("[%2.4x] %02x ", opPC, memory->read(opPC));
+    printf("[%2.4x] %02x ", opPC, mem->read(opPC));
     for (int i = instrByteLen - 1; i > 0; i--) {
-        printf("%02x", memory->read(opPC + i));
+        printf("%02x", mem->read(opPC + i));
     }
     printf("\n");
     */
@@ -30,9 +30,9 @@ void Debugger::print_instr() {
            cpu->check_flag(CPU::H_FLAG), cpu->check_flag(CPU::C_FLAG));
     printf("\tAF=%04x BC=%04x DE=%04x HL=%04x\n", cpu->AF.pair, cpu->BC.pair, cpu->DE.pair, cpu->HL.pair);
     printf("\tSP=%04x PC=%04x\n", cpu->SP, cpu->PC);
-    printf("\time=%d if=%02x ie=%02x\n", cpu->ime, memory->read(IOReg::IF_REG), memory->read(IOReg::IE_REG));
-    printf("\tly=%02x lcdc=%02x stat=%02x\n", memory->read(IOReg::LY_REG), memory->read(IOReg::LCDC_REG),
-           memory->read(IOReg::STAT_REG));
+    printf("\time=%d if=%02x ie=%02x\n", cpu->ime, mem->read(IOReg::IF_REG), mem->read(IOReg::IE_REG));
+    printf("\tly=%02x lcdc=%02x stat=%02x\n", mem->read(IOReg::LY_REG), mem->read(IOReg::LCDC_REG),
+           mem->read(IOReg::STAT_REG));
 
     // print_reg(IOReg::JOYP_REG, "Joypad");
 

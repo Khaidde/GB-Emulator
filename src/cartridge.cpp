@@ -2,7 +2,7 @@
 
 #include <cstdio>
 
-ROMOnly::ROMOnly(u8* rom) : Cartridge(CartridgeType::ROM_ONLY) {
+ROMOnly::ROMOnly(u8* rom) {
     for (int i = 0; i < ROM_SIZE; i++) {
         this->rom[i] = rom[i];
     }
@@ -17,7 +17,7 @@ void ROMOnly::write(u16 addr, u8 val) {
     printf("Warning: Attempting to write to rom only cartridge, addr=%02x val=%02x.\n", addr, val);
 }
 
-MBC1::MBC1(u8* rom, u8 numRomBanks, u8 numRamBanks) : Cartridge(CartridgeType::ROM_ONLY) {
+MBC1::MBC1(u8* rom, u8 numRomBanks, u8 numRamBanks) {
     if (numRomBanks > MAX_ROM_BANKS) {
         printf("Incompatible number of rom banks for MBC1: %d\n", numRomBanks);
         return;
@@ -42,14 +42,14 @@ MBC1::MBC1(u8* rom, u8 numRomBanks, u8 numRamBanks) : Cartridge(CartridgeType::R
     this->activeRamBank = &ramBanks[0];
 
     this->ramg = false;
-    this->mode = 0;
+    this->mode = false;
 }
 
 MBC1::~MBC1() {
     if (hasBattery) {
         printf("TODO Saving game...\n");
     }
-    delete romBanks;
+    delete[] romBanks;
 }
 
 u8 MBC1::read(u16 addr) {

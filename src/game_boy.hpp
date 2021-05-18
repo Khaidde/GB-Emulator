@@ -26,10 +26,9 @@ class GameBoy {
     static constexpr int WIDTH = 160;
     static constexpr int HEIGHT = 144;
 
-    GameBoy(const char*);
+    explicit GameBoy(const char*);
     ~GameBoy();
     void begin();
-    char get_gb_key(SDL_Keycode keycode);
 
     void render_screen();
 

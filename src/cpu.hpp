@@ -26,9 +26,9 @@ class CPU {
 
    private:
     friend class Debugger;
-    Debugger* debugger;
+    Debugger* debug;
 
-    Memory* memory;
+    Memory* mem;
 
     RegPair AF;
     RegPair BC;
@@ -60,11 +60,12 @@ class CPU {
     u8 read(u16 addr);
     void write(u16 addr, u8 val);
 
-    u8 readCycle;
-    using ReadCallback = void (*)(CPU* c);
-    ReadCallback readCallback;
-    void skd_read(u8& dest, u16 addr, ReadCallback&& callback);
-    void skd_read(u8& dest, u16 addr);
+    using Callback = void (*)(CPU* c);
+    u8 callbackCycle;
+    Callback callback;
+
+    void skd_read(u16 addr, u8& dest, Callback&& readCallback);
+    void skd_read(u16 addr, u8& dest);
     void skd_write(u16 addr, u8& val);
 
     void execute(u8 opcode);
@@ -75,7 +76,6 @@ class CPU {
 
     void add8(u8 val);
     void adc8(u8 val);
-
     void sub8(u8 val);
     void sbc8(u8 val);
 
@@ -83,7 +83,6 @@ class CPU {
     void xor8(u8 val);
     void or8(u8 val);
     void cp8(u8 val);
-
     void inc8(u8& reg);
     void dec8(u8& reg);
 
@@ -93,11 +92,9 @@ class CPU {
 
     void daa();
 
-    void jump(u16 addr);
-
-    void call(u16 addr);
-
-    u16 pop2();
+    void jump_nn();
+    void call_nn();
+    void rst(u16 addr);
 
     void freeze();
 

@@ -2,32 +2,17 @@
 
 #include "utils.hpp"
 
-enum class CartridgeType {
-    ROM_ONLY,
-    MBC1,
-    MBC2,
-    MBC3,
-    MBC5,
-    MBC6,
-    MBC7,
-    HuC3,
-    HuC1,
-};
-
 class Cartridge {
    public:
-    Cartridge(CartridgeType type) : cartType(type) {}
-    virtual ~Cartridge() {}
+    virtual ~Cartridge() = default;
     virtual u8 read(u16 addr) = 0;
     virtual void write(u16 addr, u8 val) = 0;
 
-    void setHasRam(bool hasRam) { this->hasRam = hasRam; }
-    void setHasBattery(bool hasBattery) { this->hasBattery = hasBattery; }
-    void setHasTimer(bool hasTimer) { this->hasTimer = hasTimer; }
+    void setHasRam(bool cartHasRam) { this->hasRam = cartHasRam; }
+    void setHasBattery(bool cartHasBattery) { this->hasBattery = cartHasBattery; }
+    void setHasTimer(bool cartHasTimer) { this->hasTimer = cartHasTimer; }
 
    protected:
-    CartridgeType cartType;
-
     bool hasRam = false;
     bool hasBattery = false;
     bool hasTimer = false;   // TODO unimplemented
@@ -36,7 +21,7 @@ class Cartridge {
 
 class ROMOnly : public Cartridge {
    public:
-    ROMOnly(u8* rom);
+    explicit ROMOnly(u8* rom);
     u8 read(u16 addr) override;
     void write(u16 addr, u8 val) override;
 

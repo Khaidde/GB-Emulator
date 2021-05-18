@@ -38,8 +38,9 @@ class Memory {
     u8 read(u16 addr);
     void write(u16 addr, u8 val);
 
-    void schedule_read(u8* dest, u16 addr, u8 cycle);
+    void schedule_read(u16 addr, u8* dest, u8 cycle);
     void schedule_write(u16 addr, u8* val, u8 cycle);
+    void set_bus_addr(u16 addr);
 
     void emulate_dma_cycle();
 
@@ -47,7 +48,7 @@ class Memory {
     void reset_cycles();
 
    private:
-    Debugger* debugger;
+    Debugger* debug;
 
     std::unique_ptr<Cartridge> cartridge;
 

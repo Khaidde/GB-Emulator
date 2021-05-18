@@ -28,95 +28,7 @@ void destroy_screen(Screen& screen) {
     SDL_DestroyWindow(screen.window);
 }
 
-}  // namespace
-
-GameBoy::GameBoy(const char* romPath) {
-    debugger.init(&cpu, &memory);
-
-    cpu.init(&memory, &debugger);
-
-    memory.set_debugger(&debugger);
-    memory.load_cartridge(romPath);
-
-    input.init(&memory);
-    timer.init(&memory);
-    ppu.init(&memory);
-    memory.set_peripherals(&input, &timer, &ppu);
-
-    create_screen(screen, GameBoy::WIDTH * Screen::PIXEL_SCALE, GameBoy::HEIGHT * Screen::PIXEL_SCALE, GameBoy::TITLE);
-}
-
-GameBoy::~GameBoy() { destroy_screen(screen); }
-
-void GameBoy::begin() {
-    using namespace std::chrono_literals;
-
-    std::chrono::high_resolution_clock sysTimer;
-    std::chrono::nanoseconds delta(0ns);
-    auto last = sysTimer.now();
-    static constexpr std::chrono::nanoseconds FRAME_MS(16742000ns);  // Roughly 60fps
-
-    SDL_Event e;
-    bool running = true;
-    int totalTCycles = 0;
-
-    while (running) {
-        while (SDL_PollEvent(&e)) {
-            switch (e.type) {
-                case SDL_QUIT:
-                    running = false;
-                    break;
-                case SDL_KEYUP: {
-                    char key = get_gb_key(e.key.keysym.sym);
-                    debugger.handle_function_key(e);
-                    if (key >= 0) input.handle_input(false, key);
-                } break;
-                case SDL_KEYDOWN: {
-                    char key = get_gb_key(e.key.keysym.sym);
-                    if (key >= 0) input.handle_input(true, key);
-                } break;
-            }
-            break;
-        }
-
-        while (totalTCycles < PPU::TOTAL_CLOCKS) {
-            if (cpu.isFetching() && debugger.is_paused() && !debugger.step()) {
-                break;
-            }
-            if (cpu.isFetching() && debugger.is_paused()) {
-                printf("---------------\n");
-            }
-
-            memory.emulate_dma_cycle();
-            if (cpu.isFetching()) {
-                memory.reset_cycles();
-                cpu.handle_interrupts();  // Interrupts are checked before fetching a new instruction
-            }
-            for (int i = 0; i < 4; i++) {
-                timer.emulate_clock();
-                ppu.emulate_clock();
-            }
-            cpu.emulate_cycle();
-            memory.emulate_cycle();
-            totalTCycles += 4;
-        }
-        render_screen();
-
-        if (Debugger::DO_NORMAL_SPEED) {
-            auto now = sysTimer.now();
-            delta += std::chrono::duration_cast<std::chrono::nanoseconds>(now - last);
-            last = now;
-            if (delta >= FRAME_MS) {
-                totalTCycles -= PPU::TOTAL_CLOCKS;
-                delta -= FRAME_MS;
-            }
-        } else {
-            totalTCycles -= PPU::TOTAL_CLOCKS;
-        }
-    }
-}
-
-char GameBoy::get_gb_key(SDL_Keycode keycode) {
+char get_gb_key(SDL_Keycode keycode) {
     switch (keycode) {
         case SDLK_n:  // START
             return 7;
@@ -141,6 +53,96 @@ char GameBoy::get_gb_key(SDL_Keycode keycode) {
     }
 }
 
+}  // namespace
+
+GameBoy::GameBoy(const char* romPath) {
+    debugger.init(&cpu, &memory);
+
+    cpu.init(&memory, &debugger);
+
+    memory.set_debugger(&debugger);
+    memory.load_cartridge(romPath);
+
+    input.init(&memory);
+    timer.init(&memory);
+    ppu.init(&memory);
+    memory.set_peripherals(&input, &timer, &ppu);
+
+    create_screen(screen, GameBoy::WIDTH * Screen::PIXEL_SCALE, GameBoy::HEIGHT * Screen::PIXEL_SCALE, GameBoy::TITLE);
+}
+
+GameBoy::~GameBoy() { destroy_screen(screen); }
+
+void GameBoy::begin() {
+    using namespace std::chrono_literals;
+
+    using SysTimer = std::chrono::high_resolution_clock;
+    std::chrono::milliseconds delta(0ms);
+    auto last = SysTimer::now();
+    // static constexpr std::chrono::nanoseconds FRAME_MS(16742000ns);  // Roughly 60fps
+    static constexpr std::chrono::milliseconds FRAME_MS(17ms);  // Roughly 60fps
+
+    SDL_Event e;
+    bool running = true;
+    int totalTCycles = 0;
+
+    while (running) {
+        while (totalTCycles < PPU::TOTAL_CLOCKS) {
+            if (cpu.isFetching() && debugger.is_paused() && !debugger.step()) {
+                break;
+            }
+            if (cpu.isFetching() && debugger.is_paused()) {
+                printf("---------------\n");
+            }
+
+            memory.emulate_dma_cycle();
+            if (cpu.isFetching()) {
+                memory.reset_cycles();
+                cpu.handle_interrupts();  // Interrupts are checked before fetching a new instruction
+            }
+            for (int i = 0; i < 4; i++) {
+                timer.emulate_clock();
+                ppu.emulate_clock();
+            }
+            cpu.emulate_cycle();
+            memory.emulate_cycle();
+            totalTCycles += 4;
+        }
+        totalTCycles -= PPU::TOTAL_CLOCKS;
+        render_screen();
+
+        while (SDL_PollEvent(&e)) {
+            switch (e.type) {
+                case SDL_QUIT:
+                    running = false;
+                    break;
+                case SDL_KEYUP: {
+                    char key = get_gb_key(e.key.keysym.sym);
+                    debugger.handle_function_key(e);
+                    if (key >= 0) input.handle_input(false, key);
+                } break;
+                case SDL_KEYDOWN: {
+                    char key = get_gb_key(e.key.keysym.sym);
+                    if (key >= 0) input.handle_input(true, key);
+                } break;
+            }
+            break;
+        }
+
+        if (Debugger::DO_NORMAL_SPEED) {
+            auto now = SysTimer::now();
+            delta += std::chrono::duration_cast<std::chrono::milliseconds>(FRAME_MS - (now - last));
+            last = now;
+            if (delta > 0ms) {
+                SDL_Delay(delta.count());
+                delta = 0ms;
+            }
+        } else {
+            totalTCycles -= PPU::TOTAL_CLOCKS;
+        }
+    }
+}
+
 void GameBoy::render_screen() {
     SDL_RenderClear(screen.renderer);
 
@@ -154,6 +156,6 @@ void GameBoy::render_screen() {
 
     SDL_UnlockTexture(screen.bufferTexture);
 
-    SDL_RenderCopy(screen.renderer, screen.bufferTexture, NULL, NULL);
+    SDL_RenderCopy(screen.renderer, screen.bufferTexture, nullptr, nullptr);
     SDL_RenderPresent(screen.renderer);
 }

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <SDL.h>
-#include <stdio.h>
 
 #include "cpu.hpp"
 #include "memory.hpp"
@@ -14,7 +13,7 @@ class Debugger {
    public:
     static constexpr bool DO_NORMAL_SPEED = true;
 
-    void init(CPU* cpu, Memory* memory);
+    void init(CPU* c, Memory* memory);
 
     void update_instr(u16 opPC);
     void inc_instr_bytes() { instrByteLen++; }
@@ -32,7 +31,7 @@ class Debugger {
 
    private:
     CPU* cpu;
-    Memory* memory;
+    Memory* mem;
 
     u8 stepCnt;
     bool pause;

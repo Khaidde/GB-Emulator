@@ -14,7 +14,7 @@ int main(int argc, char** argv) {
 
         gameBoy.begin();
     } catch (const std::exception& e) {
-        fprintf(stderr, e.what());
+        fprintf(stderr, "%s", e.what());
         SDL_Quit();
         return 1;
     }
