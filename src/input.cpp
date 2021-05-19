@@ -5,7 +5,7 @@ void Input::handle_input(bool pressed, u8 key) {
     u8 keyBit = 1 << key;
 
     if (!(~keyState & keyBit) && pressed) {
-        mem->request_interrupt(Interrupt::JOYPAD_INT);
+        memory->request_interrupt(Interrupt::JOYPAD_INT);
     }
     keyState = (keyState | keyBit) & ~(keyBit * pressed);
 }

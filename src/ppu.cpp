@@ -2,8 +2,7 @@
 
 #include "game_boy.hpp"
 
-void PPU::init(Memory* memory) {
-    this->mem = memory;
+void PPU::restart() {
     lcdc = &memory->ref(IOReg::LCDC_REG);
     stat = &memory->ref(IOReg::STAT_REG);
     scy = &memory->ref(IOReg::SCY_REG);
@@ -13,8 +12,10 @@ void PPU::init(Memory* memory) {
     wy = &memory->ref(IOReg::WY_REG);
     wx = &memory->ref(IOReg::WX_REG);
 
+    oamAddrBlock = &memory->ref(OAM_START_ADDR);
+
     bufferSel = false;
-    for (int i = 0; i < GameBoy::WIDTH * GameBoy::HEIGHT; i++) {
+    for (int i = 0; i < Constants::WIDTH * Constants::HEIGHT; i++) {
         (frameBuffers[0])[i] = BLANK_COLOR;
         (frameBuffers[1])[i] = BLANK_COLOR;
     }
@@ -24,22 +25,16 @@ void PPU::init(Memory* memory) {
     *ly = 0x99;
 
     statTrigger = false;
-    curCycleStatTrigger = false;
+    statIntrFlags = 0;
     modeSwitchClocks = 0;
 }
 
 void PPU::render(u32* pixelBuffer) {
     FrameBuffer* curBuffer = &frameBuffers[!bufferSel];
-    for (int i = 0; i < GameBoy::WIDTH * GameBoy::HEIGHT; i++) {
+    for (int i = 0; i < Constants::WIDTH * Constants::HEIGHT; i++) {
         pixelBuffer[i] = get_lcdc_flag(LCDCFlag::LCD_ENABLE) ? (*curBuffer)[i] : BLANK_COLOR;
     }
 }
-
-namespace {
-
-u16 get_sprite_addr(u8 index) { return 0xFE00 + (index << 2); }
-
-}  // namespace
 
 extern bool test;
 int cnt = 0;
@@ -48,7 +43,7 @@ void PPU::emulate_clock() {
         drawClocks = 0;
         mode = Mode::H_BLANK;
         *stat = (*stat & 0xFC) | 2;
-        statTrigger = false;
+        statIntrFlags = 0;
         return;
     }
     drawClocks++;
@@ -65,14 +60,17 @@ void PPU::emulate_clock() {
         cnt = (SCAN_LINE_CLOCKS - drawClocks) / 2;
     }
     if (test) {
-        printf("\t\t\t%d-%d\n", cnt, drawClocks);
+        printf("\t\t\t%d-%d-%d\n", cnt, drawClocks, statTrigger);
     }
-    curCycleStatTrigger = false;
     if (modeSwitchClocks > 0) {
         modeSwitchClocks--;
         if (modeSwitchClocks == 0) {
             *stat = (*stat & 0xFC) | mode;
-            update_stat();
+            statIntrFlags &= 0x8;
+            if (mode < 3 && (*stat & (1 << (mode + 3)))) {
+                statIntrFlags |= 1 << mode;
+                trigger_stat_intr();
+            }
         }
     }
     switch (mode) {
@@ -82,13 +80,19 @@ void PPU::emulate_clock() {
 
                 spriteList.clear();
                 for (int i = 0; i < 40; i++) {
-                    u16 addr = get_sprite_addr(i);
-                    u8 y = mem->read(addr);
-                    u8 x = mem->read(addr + 1);
+                    u8* spritePtr = &oamAddrBlock[i << 2];
+                    u8 y = *spritePtr;
+                    u8 x = *(spritePtr + 1);
 
-                    if (x > 0 && *ly + 16 >= y && *ly + 16 < y + (get_lcdc_flag(LCDCFlag::SPRITE_SIZE) ? 16 : 8)) {
-                        spriteList.add({y, x, mem->read(addr + 2), mem->read(addr + 3)});
-                        if (spriteList.size == SpriteList::MAX_SPRITES) break;
+                    u8 botBound = *ly + 16;
+                    u8 spriteHeight = get_lcdc_flag(LCDCFlag::SPRITE_SIZE) ? 16 : 8;
+                    if (x > 0) {
+                        if (botBound - spriteHeight < y && y <= botBound) {
+                            u8 tileID = *(spritePtr + 2);
+                            u8 flags = *(spritePtr + 3);
+                            spriteList.add({y, x, tileID, flags});
+                            if (spriteList.size == SpriteList::MAX_SPRITES) break;
+                        }
                     }
                 }
 
@@ -103,40 +107,11 @@ void PPU::emulate_clock() {
                 pxlFifo.clear();
 
                 set_mode(LCD_TRANSFER);
-                // TODO prohibit cpu vram access
             }
             break;
         case LCD_TRANSFER: {
             if (pxlFifo.size > 8 && !fetcher.curSprite) {
-                if (numDiscardedPixels < *scx % TILE_PX_SIZE) {
-                    numDiscardedPixels++;
-                    pxlFifo.pop_head();
-                } else {
-                    if (!fetcher.windowMode && get_lcdc_flag(LCDCFlag::WINDOW_ENABLE) &&
-                        get_lcdc_flag(LCDCFlag::BG_WINDOW_ENABLE) && *ly == *wy && curPixelX >= *wx - 7) {
-                        fetcher.windowMode = true;
-                        printf("TODO window mode not implemented yet\n");
-                    } else {
-                        if (get_lcdc_flag(LCDCFlag::SPRITE_ENABLE)) {
-                            for (int i = 0; i < spriteList.size; i++) {
-                                // Check if sprite has already been handled
-                                if ((spriteList.removedBitField & (1 << i)) != 0) continue;
-
-                                Sprite* sprite = &spriteList.data[i];
-                                if (sprite->x <= curPixelX + 8) {
-                                    fetcher.doFetch = false;
-                                    fetcher.fetchState = Fetcher::READ_TILE_ID;
-                                    fetcher.curSprite = sprite;
-                                    spriteList.remove(i);
-                                    break;
-                                }
-                            }
-                        }
-                        if (!fetcher.curSprite) {
-                            frameBuffers[bufferSel][*ly * GameBoy::WIDTH + curPixelX++] = get_color(pxlFifo.pop_head());
-                        }
-                    }
-                }
+                handle_pixel_push();
             }
 
             if (fetcher.doFetch) {
@@ -148,7 +123,7 @@ void PPU::emulate_clock() {
             }
             fetcher.doFetch = !fetcher.doFetch;
 
-            if (curPixelX == GameBoy::WIDTH) {
+            if (curPixelX == Constants::WIDTH) {
                 // printf("----------------------ly=%d,c=%d\n", *ly, drawClocks);
                 set_mode(H_BLANK);
             }
@@ -157,40 +132,104 @@ void PPU::emulate_clock() {
             if (drawClocks >= LCD_AND_H_BLANK_CLOCKS) {
                 drawClocks -= LCD_AND_H_BLANK_CLOCKS;
                 (*ly)++;
-                update_stat();
 
-                if (*ly >= GameBoy::HEIGHT) {
-                    mem->request_interrupt(Interrupt::VBLANK_INT);
+                if (*ly >= Constants::HEIGHT) {
+                    memory->request_interrupt(Interrupt::VBLANK_INT);
                     set_mode(V_BLANK);
                 } else {
                     set_mode(OAM_SEARCH);
                 }
+                update_coincidence();
+                trigger_stat_intr();
             }
             break;
         case V_BLANK:
             if (drawClocks == 5 && *ly == V_BLANK_END_LINE - 1) {
-                update_stat();
+                update_coincidence();
+                trigger_stat_intr();
             }
             if (drawClocks >= SCAN_LINE_CLOCKS) {
                 drawClocks -= SCAN_LINE_CLOCKS;
                 (*ly)++;
-                update_stat();
 
                 if (*ly >= V_BLANK_END_LINE) {
                     bufferSel = !bufferSel;
                     *ly = 0;
-                    update_stat();
                     set_mode(OAM_SEARCH);
                 }
+                update_coincidence();
+                trigger_stat_intr();
             }
             break;
     }
-    trigger_stat_intr();
+}
+
+void PPU::update_coincidence() {
+    bool coincidence = read_ly() == *lyc;
+    *stat = (*stat & 0xFB) | (coincidence << 2);
+
+    bool lyLycEn = *stat & (1 << 6);
+    statIntrFlags = ((lyLycEn && coincidence) << 3) | (statIntrFlags & 0x7);
+}
+
+void PPU::update_stat() {
+    statIntrFlags &= 0x8;
+    for (int i = 3; i <= 5; i++) {
+        if (*stat & (1 << i) && (*stat & 0x3) == i - 3) {
+            statIntrFlags |= 1 << (i - 3);
+        }
+    }
+    update_coincidence();
+}
+
+void PPU::trigger_stat_intr() {
+    if (statIntrFlags) {
+        if (!statTrigger) {
+            statTrigger = true;
+            memory->request_interrupt(Interrupt::STAT_INT);
+        }
+    } else {
+        statTrigger = false;
+    }
 }
 
 u8 PPU::read_ly() {
     if (*ly == 0x99 && drawClocks > 4) return 0;
     return *ly;
+}
+
+bool PPU::is_vram_blocked() { return false; }
+bool PPU::is_oam_blocked() { return *stat & 0x2; }
+
+void PPU::handle_pixel_push() {
+    if (!fetcher.windowMode && get_lcdc_flag(LCDCFlag::WINDOW_ENABLE) && *ly >= *wy && curPixelX >= *wx - 7) {
+        fetcher.tileX = 0;
+        fetcher.windowMode = true;
+        pxlFifo.clear();
+        return;
+    }
+    if (!fetcher.windowMode && numDiscardedPixels < *scx % TILE_PX_SIZE) {
+        numDiscardedPixels++;
+        pxlFifo.pop_head();
+        return;
+    }
+    if (get_lcdc_flag(LCDCFlag::SPRITE_ENABLE)) {
+        for (int i = 0; i < spriteList.size; i++) {
+            if ((spriteList.removedBitField & (1 << i)) != 0) continue;
+
+            Sprite* sprite = &spriteList.data[i];
+            if (sprite->x <= curPixelX + 8) {
+                fetcher.doFetch = false;
+                fetcher.fetchState = Fetcher::READ_TILE_ID;
+                fetcher.curSprite = sprite;
+                spriteList.remove(i);
+                break;
+            }
+        }
+    }
+    if (!fetcher.curSprite) {
+        frameBuffers[bufferSel][*ly * Constants::WIDTH + curPixelX++] = get_color(pxlFifo.pop_head());
+    }
 }
 
 void PPU::background_fetch() {
@@ -202,16 +241,19 @@ void PPU::background_fetch() {
                               : 0x9800;
 
             s8 tileIndex;
+            u8 tileByteOff;
             if (fetcher.windowMode) {
-                printf("TODO window mode not implemented yet\n");
-                tileIndex = 0;
+                u8 tileX = fetcher.tileX % TILESET_SIZE;
+                u8 tileY = ((*ly - *wy) / TILE_PX_SIZE) % TILESET_SIZE;
+                tileIndex = memory->read((tileX + tileY * TILESET_SIZE) + tileMap);
+                tileByteOff = ((*ly - *wy) % TILE_PX_SIZE) * 2;
             } else {
                 u8 tileX = (*scx / TILE_PX_SIZE + fetcher.tileX) % TILESET_SIZE;
                 u8 tileY = ((*scy + *ly) / TILE_PX_SIZE) % TILESET_SIZE;
-                tileIndex = mem->read((tileX + tileY * TILESET_SIZE) + tileMap);
+                tileIndex = memory->read((tileX + tileY * TILESET_SIZE) + tileMap);
+                tileByteOff = ((*scy + *ly) % TILE_PX_SIZE) * 2;
             }
 
-            u8 tileByteOff = ((*ly + *scy) % TILE_PX_SIZE) * 2;
             bool unsign = get_lcdc_flag(LCDCFlag::TILE_DATA_SELECT);
             if (unsign) {
                 fetcher.tileRowAddr = VRAM_TILE_DATA_0 + (u8)tileIndex * TILE_MEM_LEN + tileByteOff;
@@ -221,11 +263,11 @@ void PPU::background_fetch() {
             fetcher.fetchState = Fetcher::READ_TILE_0;
         } break;
         case Fetcher::READ_TILE_0:
-            fetcher.data0 = mem->read(fetcher.tileRowAddr);
+            fetcher.data0 = memory->read(fetcher.tileRowAddr);
             fetcher.fetchState = Fetcher::READ_TILE_1;
             break;
         case Fetcher::READ_TILE_1:
-            fetcher.data1 = mem->read(fetcher.tileRowAddr + 1);
+            fetcher.data1 = memory->read(fetcher.tileRowAddr + 1);
             if (pxlFifo.size >= 8) {
                 fetcher.fetchState = Fetcher::PUSH;
             }
@@ -259,14 +301,13 @@ void PPU::sprite_fetch() {
         case Fetcher::READ_TILE_ID: {
             u8 tileIndex = fetcher.curSprite->tileID;
             if (get_lcdc_flag(LCDCFlag::SPRITE_SIZE)) {
-                // printf("TODO test tall sprite mode");
                 tileIndex &= ~0x1;  // Make tileIndex even
             }
 
             u8 tileByteOff;
             bool yFlip = fetcher.curSprite->flags & (1 << 6);
             if (yFlip) {
-                tileByteOff = (fetcher.curSprite->y - *ly - 0x9) * 2;
+                tileByteOff = (fetcher.curSprite->y - *ly - 0x1) * 2;
             } else {
                 tileByteOff = (0x10 - (fetcher.curSprite->y - *ly)) * 2;
             }
@@ -275,11 +316,11 @@ void PPU::sprite_fetch() {
             fetcher.fetchState = Fetcher::READ_TILE_0;
         } break;
         case Fetcher::READ_TILE_0:
-            fetcher.data0 = mem->read(fetcher.tileRowAddr);
+            fetcher.data0 = memory->read(fetcher.tileRowAddr);
             fetcher.fetchState = Fetcher::READ_TILE_1;
             break;
         case Fetcher::READ_TILE_1:
-            fetcher.data1 = mem->read(fetcher.tileRowAddr + 1);
+            fetcher.data1 = memory->read(fetcher.tileRowAddr + 1);
 
         case Fetcher::PUSH: {
             int xOff = fetcher.curSprite->x < 8 ? 8 - fetcher.curSprite->x : 0;
@@ -326,39 +367,11 @@ void PPU::set_mode(Mode m) {
     this->mode = m;
 }
 
-void PPU::update_stat() {
-    bool coincidence = read_ly() == *lyc;
-    *stat = (*stat & 0xFB) | (coincidence << 2);  // update coincidence flag
-
-    bool lyLycEn = *stat & (1 << 6);
-    if (lyLycEn && coincidence) {
-        curCycleStatTrigger = true;
-    } else {
-        for (int i = 3; i <= 5; i++) {
-            if (*stat & (1 << i) && mode == i - 3) {
-                curCycleStatTrigger = true;
-                break;
-            }
-        }
-    }
-}
-
-void PPU::trigger_stat_intr() {
-    if (curCycleStatTrigger) {
-        if (!statTrigger) {
-            statTrigger = true;
-            mem->request_interrupt(Interrupt::STAT_INT);
-        }
-    } else {
-        statTrigger = false;
-    }
-}
-
 u32 PPU::get_color(FIFOData&& data) {
     data.colIndex &= 0x03;
 
     u8 i = (data.colIndex << 1);
     u8 mask = 3 << i;
 
-    return baseColors[(mem->read(data.palleteAddr) & mask) >> i];
+    return baseColors[(memory->read(data.palleteAddr) & mask) >> i];
 }

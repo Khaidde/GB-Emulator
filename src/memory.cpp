@@ -1,16 +1,14 @@
 #include "memory.hpp"
 
-#include <cstdio>
 #include <fstream>
 #include <vector>
 
 Memory::Memory() {
-    oamInaccessible = false;
+    dmaInProgress = false;
     scheduleDma = false;
     dmaCycleCnt = 0;
     scheduledMemoryOps.clear();
     reset_cycles();
-    restart();
 }
 
 void Memory::restart() {
@@ -35,14 +33,6 @@ void Memory::restart() {
 
     mem[IOReg::IF_REG] = 0xE1;
     mem[IOReg::IE_REG] = 0x00;
-}
-
-void Memory::set_debugger(Debugger* debugger) { this->debug = debugger; }
-
-void Memory::set_peripherals(Input* input, Timer* timer, PPU* ppu) {
-    this->input = input;
-    this->timer = timer;
-    this->ppu = ppu;
 }
 
 void Memory::load_cartridge(const char* romPath) {
@@ -155,11 +145,14 @@ u8 Memory::read(u16 addr) {
     if (addr < 0x8000 || (0xA000 <= addr && addr < 0xC000)) {
         return cartridge->read(addr);
     }
-    if (0xFE00 <= addr && addr < 0xFEA0 && oamInaccessible) {
-        return 0xFF;
-    }
-    if (0xFEA0 <= addr && addr < 0xFF00) {
-        return 0;
+    if (0xFE00 <= addr && addr < 0xFF00) {
+        if (dmaInProgress) {
+            return addr < 0xFEA0 ? 0xFF : 0x00;
+        }
+        if (ppu->is_oam_blocked()) {
+            return 0xFF;
+        }
+        return mem[addr];
     }
     switch (addr) {
         case IOReg::JOYP_REG:
@@ -181,40 +174,51 @@ void Memory::write(u16 addr, u8 val) {
         mem[addr + 0x2000] = val;
         return;
     }
-    if (0xFE00 <= addr && addr < 0xFEA0 && oamInaccessible) {
-        return;  // TODO assuming that oam writes have no effect during dma
+    if (0xFE00 <= addr && addr < 0xFF00) {
+        if (dmaInProgress) {
+            if (addr < 0xFEA0) {
+                return;  // TODO assuming that oam writes have no effect during dma
+            } else {
+                fatal("Bad write to addr=%04x", addr);
+            }
+        }
+        if (ppu->is_oam_blocked()) {
+            return;
+        }
     }
     switch (addr) {
         case IOReg::JOYP_REG:
             mem[addr] = 0xC0 | (val & 0x30) | (mem[addr] & 0x0F);
-            return;
+            break;
         case IOReg::SB_REG:
             printf("%c", val);
             mem[addr] = val;
+            break;
         case IOReg::SC_REG:
             mem[addr] = (val & (1 << 8)) | 0x7E | (val & 1);
-            return;
+            break;
         case IOReg::DIV_REG:
             timer->reset_div();
-            return;
+            break;
         case IOReg::TAC_REG:
             timer->set_enable((val >> 2) & 0x1);
             timer->set_frequency(val & 0x3);
             mem[addr] = 0xF8 | (val & 0x7);
-            return;
+            break;
         case IOReg::LCDC_REG:
             if ((val & (1 << 7)) == 0) mem[IOReg::LY_REG] = 0;
             mem[addr] = val;
+            break;
         case IOReg::STAT_REG:
             mem[addr] = 0x80 | (val & 0x78) | (mem[addr] & 0x7);
             ppu->update_stat();
             ppu->trigger_stat_intr();
-            return;
+            break;
         case IOReg::LYC_REG:
             mem[addr] = val;
-            ppu->update_stat();
+            ppu->update_coincidence();
             ppu->trigger_stat_intr();
-            return;
+            break;
         case IOReg::DMA_REG:
             if (0xFE <= val && val <= 0xFF) {
                 printf("TODO illegal DMA source value\n");
@@ -223,10 +227,10 @@ void Memory::write(u16 addr, u8 val) {
             scheduleDma = true;
             dmaStartAddr = val << 8;
             mem[addr] = val;
-            return;
+            break;
         case IOReg::IF_REG:
             mem[addr] = 0xE0 | (val & 0x1F);
-            return;
+            break;
         default:
             mem[addr] = val;
     }
@@ -241,13 +245,16 @@ void Memory::emulate_dma_cycle() {
         if (dmaCycleCnt <= 160) {
             u8 i = 160 - dmaCycleCnt;
             mem[0xFE00 + i] = read(dmaStartAddr + i);
+            if (mem[0xFE00 + i] == 0xFF) {
+                printf("!!!!\n");
+            }
             if (i == 0) {
-                oamInaccessible = true;
+                dmaInProgress = true;
             }
         }
         dmaCycleCnt--;
         if (dmaCycleCnt == 0) {
-            oamInaccessible = false;
+            dmaInProgress = false;
         }
     }
     if (scheduleDma) {

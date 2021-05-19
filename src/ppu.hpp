@@ -55,17 +55,21 @@ class PPU {
 
     static constexpr int TOTAL_CLOCKS = SCAN_LINE_CLOCKS * V_BLANK_END_LINE;
 
-    void init(Memory* memory);
+    PPU(Memory* memory) : memory(memory) {}
+    void restart();
     void render(u32* pixelBuffer);
     void emulate_clock();
 
     void update_stat();
+    void update_coincidence();
     void trigger_stat_intr();
 
     u8 read_ly();
+    bool is_vram_blocked();
+    bool is_oam_blocked();
 
    private:
-    Memory* mem;
+    Memory* memory;
 
     u8* lcdc;
     u8* stat;
@@ -75,6 +79,9 @@ class PPU {
     u8* lyc;
     u8* wy;
     u8* wx;
+
+    static constexpr u16 OAM_START_ADDR = 0xFE00;
+    u8* oamAddrBlock;
 
     using FrameBuffer = u32[160 * 144];
     bool bufferSel;
@@ -119,8 +126,8 @@ class PPU {
         OAM_SEARCH = 2,
         LCD_TRANSFER = 3,
     } mode;
+    u8 statIntrFlags;  // 3: ly=lyc, 2: oam, 1: v-blank, 0: h-blank
     bool statTrigger;
-    bool curCycleStatTrigger;
     int modeSwitchClocks;
 
     // ICE_CREAM_GB const u32 baseColors[4] = {0xFFFFF6D3, 0xFFF9A875, 0xFFEB6B6F, 0xFF7C3F58};
@@ -131,6 +138,8 @@ class PPU {
     // CAVE4
     const u32 baseColors[4] = {0xFFE4CBBF, 0xFF938282, 0xFF4F4E80, 0xFF2C0016};
     const u32 BLANK_COLOR = 0xFF101010;
+
+    void handle_pixel_push();
 
     void background_fetch();
     void sprite_fetch();

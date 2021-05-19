@@ -17,7 +17,9 @@ union RegPair {
 
 class CPU {
    public:
-    void init(Memory* memory, Debugger* debugger);
+    CPU() { restart(); }
+    void set_memory(Memory& memory) { this->memory = &memory; }
+    void set_debugger(Debugger& debugger) { this->debugger = &debugger; }
     void restart();
 
     void handle_interrupts();
@@ -26,9 +28,9 @@ class CPU {
 
    private:
     friend class Debugger;
-    Debugger* debug;
+    Debugger* debugger;
 
-    Memory* mem;
+    Memory* memory;
 
     RegPair AF;
     RegPair BC;

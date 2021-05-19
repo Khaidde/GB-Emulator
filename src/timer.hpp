@@ -6,7 +6,8 @@ class Memory;
 
 class Timer {
    public:
-    void init(Memory* memory);
+    Timer(Memory* memory) : memory(memory) {}
+    void restart();
     void emulate_clock();
 
     void reset_div();
@@ -14,7 +15,7 @@ class Timer {
     void set_frequency(u8 mode);
 
    private:
-    Memory* mem;
+    Memory* memory;
 
     u8* div;
     u8* tima;

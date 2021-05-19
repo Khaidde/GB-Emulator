@@ -8,24 +8,11 @@ void Debugger::init(CPU* c, Memory* memory) {
     pause = false;
 }
 
-void Debugger::update_instr(u16 opPC) {
-    this->opPC = opPC;
-    instrByteLen = 0;
-}
-
 void Debugger::print_reg(u16 address, const char* name) {
     printf("\t%2.4x: %02x (%s)\n", address, mem->read(address), name);
 }
 
-void Debugger::print_instr() {
-    /*
-    printf("[%2.4x] %02x ", opPC, mem->read(opPC));
-    for (int i = instrByteLen - 1; i > 0; i--) {
-        printf("%02x", mem->read(opPC + i));
-    }
-    printf("\n");
-    */
-
+void Debugger::print_info() {
     printf("\tZNHC=%d%d%d%d\n", cpu->check_flag(CPU::Z_FLAG), cpu->check_flag(CPU::N_FLAG),
            cpu->check_flag(CPU::H_FLAG), cpu->check_flag(CPU::C_FLAG));
     printf("\tAF=%04x BC=%04x DE=%04x HL=%04x\n", cpu->AF.pair, cpu->BC.pair, cpu->DE.pair, cpu->HL.pair);
@@ -55,16 +42,7 @@ void Debugger::print_instr() {
     */
 }
 
-void Debugger::handle_function_key(SDL_Event e) {
-    if (e.key.keysym.sym == SDLK_F7) {
-        stepCnt++;
-    }
-    if (e.key.keysym.sym == SDLK_F9) {
-        continue_exec();
-    }
-}
-
-bool Debugger::step() {
+bool Debugger::can_step() {
     if (stepCnt > 0) {
         stepCnt--;
         return true;

@@ -28,8 +28,11 @@ class Memory {
    public:
     Memory();
     void restart();
-    void set_debugger(Debugger* debugger);
-    void set_peripherals(Input* input, Timer* timer, PPU* ppu);
+    void set_debugger(Debugger& debugger) { this->debug = &debugger; }
+    void set_input(Input& input) { this->input = &input; }
+    void set_timer(Timer& timer) { this->timer = &timer; }
+    void set_ppu(PPU& ppu) { this->ppu = &ppu; }
+
     void load_cartridge(const char* romPath);
 
     void request_interrupt(Interrupt interrupt);
@@ -40,7 +43,6 @@ class Memory {
 
     void schedule_read(u16 addr, u8* dest, u8 cycle);
     void schedule_write(u16 addr, u8* val, u8 cycle);
-    void set_bus_addr(u16 addr);
 
     void emulate_dma_cycle();
 
@@ -62,7 +64,7 @@ class Memory {
     Queue<MemoryOp, 16> scheduledMemoryOps;
     u8 cycleCnt;
 
-    bool oamInaccessible;
+    bool dmaInProgress;
     bool scheduleDma;
     u16 dmaStartAddr;
     u8 dmaCycleCnt;

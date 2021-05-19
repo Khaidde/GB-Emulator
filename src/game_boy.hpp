@@ -1,7 +1,5 @@
 #pragma once
 
-#include <SDL.h>
-
 #include "cartridge.hpp"
 #include "cpu.hpp"
 #include "debugger.hpp"
@@ -10,32 +8,25 @@
 #include "ppu.hpp"
 #include "timer.hpp"
 
-struct Screen {
-    static constexpr int PIXEL_SCALE = 4;
-
-    SDL_Window* window;
-    SDL_Renderer* renderer;
-
-    int pitch = 0;
-    SDL_Texture* bufferTexture;
-};
-
 class GameBoy {
    public:
-    static constexpr const char* TITLE = "GameBoy Emulator";
-    static constexpr int WIDTH = 160;
-    static constexpr int HEIGHT = 144;
+    GameBoy();
+    void load(const char* romPath);
+    void set_debugger(Debugger& debugger) {
+        this->debugger = &debugger;
+        debugger.init(&cpu, &memory);
 
-    explicit GameBoy(const char*);
-    ~GameBoy();
-    void begin();
+        cpu.set_debugger(debugger);
+        memory.set_debugger(debugger);
+    }
 
-    void render_screen();
+    void handle_key_code(bool pressed, JoypadButton button) { input.handle_input(pressed, (char)button); }
+    void emulate_frame(u32* screenBuffer);
 
    private:
-    Screen screen;
+    Debugger* debugger;
 
-    Debugger debugger;
+    int totalTCycles;
 
     Input input;
     Timer timer;

@@ -1,7 +1,5 @@
 #pragma once
 
-#include <SDL.h>
-
 #include "cpu.hpp"
 #include "memory.hpp"
 #include "utils.hpp"
@@ -11,19 +9,13 @@ class Memory;
 
 class Debugger {
    public:
-    static constexpr bool DO_NORMAL_SPEED = true;
-
     void init(CPU* c, Memory* memory);
 
-    void update_instr(u16 opPC);
-    void inc_instr_bytes() { instrByteLen++; }
-
     void print_reg(u16 address, const char* name);
-    void print_instr();
-    void handle_function_key(SDL_Event e);
+    void print_info();
 
-    // Returns whether or not a step was successful
-    bool step();
+    bool can_step();
+    void step() { stepCnt++; }
 
     void pause_exec() { pause = true; }
     void continue_exec() { pause = false; }
@@ -35,7 +27,4 @@ class Debugger {
 
     u8 stepCnt;
     bool pause;
-
-    u16 opPC;
-    u8 instrByteLen;
 };

@@ -1,13 +1,5 @@
 #include "cpu.hpp"
 
-#include <cstdio>
-
-void CPU::init(Memory* memory, Debugger* debugger) {
-    this->mem = memory;
-    this->debug = debugger;
-    restart();
-}
-
 void CPU::restart() {
     AF.pair = 0x01B0;
     BC.pair = 0x0013;
@@ -29,8 +21,8 @@ bool test = false;
 extern u8 cnt;
 void CPU::handle_interrupts() {
     // TODO handle weird push to IE case
-    u8 ifReg = mem->read(IOReg::IF_REG);
-    u8 interrupts = ifReg & mem->read(IOReg::IE_REG) & 0x1F;
+    u8 ifReg = memory->read(IOReg::IF_REG);
+    u8 interrupts = ifReg & memory->read(IOReg::IE_REG) & 0x1F;
     if (interrupts) {
         // TODO only add extra cycle if emulating CGB
         // if (halted) cycleAcc++;  // Extra cycle if cpu is in halt mode
@@ -38,7 +30,7 @@ void CPU::handle_interrupts() {
         if (ime) {
             for (int i = 0; i < 5; i++) {
                 if (interrupts & (1 << i)) {
-                    printf("Interrupt! %02x from %02x\n", i * 0x8 + 0x40, PC);
+                    // printf("Interrupt! %02x from %02x\n", i * 0x8 + 0x40, PC);
                     push(PC);
                     PC = i * 0x8 + 0x40;
 
@@ -62,10 +54,9 @@ bool CPU::isFetching() { return cycleCnt == 0; }
 
 void CPU::emulate_cycle() {
     if (isFetching()) {
-        if (debug->is_paused()) {
-            debug->print_instr();
+        if (debugger->is_paused()) {
+            debugger->print_info();
         }
-        debug->update_instr(PC);
 
         if (test) printf("cc=%d PC=%02x\n", cnt + 2, PC);
 
@@ -74,7 +65,7 @@ void CPU::emulate_cycle() {
         }
 
         u8 op = n();
-        if (debug->is_paused()) {
+        if (debugger->is_paused()) {
             printf("fetch--%04x-%02x\n", PC - 1, op);
         }
 
@@ -95,7 +86,11 @@ void CPU::emulate_cycle() {
         // if (PC == 0x1D2 && memory->read(IOReg::LY_REG) == 0x00) {
         // if (PC == 0x196) {
         // if (PC == 0xff9C) {
-        if (PC == 0x2A6) {
+        // if (PC >= 0x190 && memory->read(IOReg::LY_REG) == 0x98) {
+        if (PC == 0x1A7 && memory->read(IOReg::LY_REG) == 0x01) {
+            // if (PC == 0x164) {
+            // printf("%02x\n", memory->read(IOReg::LY_REG));
+            // debugger->pause_exec();
             // test = true;
         }
     }
@@ -119,7 +114,7 @@ void CPU::execute(u8 opcode) {
             PC++;  // Stop instruction will skip the immediate next byte
             break; // STOP
         case 0x76: { // HALT
-            bool interrupts = mem->read(IOReg::IF_REG) & mem->read(IOReg::IE_REG) & 0x1F;
+            bool interrupts = memory->read(IOReg::IF_REG) & memory->read(IOReg::IE_REG) & 0x1F;
             halted = ime || !interrupts;
             if (!halted) haltBug = true;
         } break;
@@ -701,26 +696,21 @@ void CPU::execute_cb() {
 
 void CPU::set_flag(u8 flag, bool set) { AF.lo = (AF.lo & ~flag) | (flag * set); }
 bool CPU::check_flag(u8 flag) { return (AF.lo & flag) != 0; }
-u8 CPU::n() {
-    debug->inc_instr_bytes();
-    return read(PC++);
-}
+u8 CPU::n() { return read(PC++); }
 u16 CPU::nn() {
     u16 res = read(PC);
     PC++;
     res |= read(PC) << 8;
     PC++;
-    debug->inc_instr_bytes();
-    debug->inc_instr_bytes();
     return res;
 }
 u8 CPU::read(u16 addr) {
     cycleCnt++;
-    return mem->read(addr);
+    return memory->read(addr);
 }
 void CPU::write(u16 addr, u8 val) {
     cycleCnt++;
-    mem->write(addr, val);
+    memory->write(addr, val);
 }
 void CPU::skd_read(u16 addr, u8& dest, Callback&& readCallback) {
     skd_read(addr, dest);
@@ -728,11 +718,11 @@ void CPU::skd_read(u16 addr, u8& dest, Callback&& readCallback) {
     callback = readCallback;
 }
 void CPU::skd_read(u16 addr, u8& dest) {
-    mem->schedule_read(addr, &dest, cycleCnt);
+    memory->schedule_read(addr, &dest, cycleCnt);
     cycleCnt++;
 }
 void CPU::skd_write(u16 addr, u8& val) {
-    mem->schedule_write(addr, &val, cycleCnt);
+    memory->schedule_write(addr, &val, cycleCnt);
     cycleCnt++;
 }
 
@@ -902,7 +892,7 @@ void CPU::rst(u16 addr) {
 
 void CPU::freeze() {
     printf("Invalid opcode, freezing...\n");
-    debug->pause_exec();
+    debugger->pause_exec();
 }
 
 void CPU::rlc8(u8& reg) {

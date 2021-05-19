@@ -2,8 +2,8 @@
 
 #include "memory.hpp"
 
-void Timer::init(Memory* memory) {
-    this->mem = memory;
+void Timer::restart() {
+    this->memory = memory;
     div = &memory->ref(IOReg::DIV_REG);
     tima = &memory->ref(IOReg::TIMA_REG);
     clocks = 0xABCC;
@@ -19,15 +19,15 @@ void Timer::emulate_clock() {
     clocks++;
 
     if (timaScheduled) {
-        mem->write(IOReg::TIMA_REG, mem->read(IOReg::TMA_REG));
-        mem->request_interrupt(Interrupt::TIMER_INT);
+        memory->write(IOReg::TIMA_REG, memory->read(IOReg::TMA_REG));
+        memory->request_interrupt(Interrupt::TIMER_INT);
         timaScheduled = false;
     }
 
     bool newBitSet = (clocks >> bitFreq) & enabled;
     if (!newBitSet && oldBitSet) {
         (*tima)++;
-        if (mem->read(IOReg::TIMA_REG) == 0) timaScheduled = true;
+        if (memory->read(IOReg::TIMA_REG) == 0) timaScheduled = true;
     }
     oldBitSet = newBitSet;
 

@@ -3,18 +3,18 @@
 #include <cstdint>
 #include <stdexcept>
 
-#define fatal(...)                                                                     \
-    char buff[0xFF] = "FATAL ERROR: ";                                                 \
-    snprintf(buff + 13 * sizeof(char), sizeof(buff) - 13 * sizeof(char), __VA_ARGS__); \
-    throw std::runtime_error(buff)
-
 using u8 = uint8_t;
 using u16 = uint16_t;
 using u32 = uint32_t;
 
 using s8 = int8_t;
 
-template <class T, int capacity>
+#define fatal(...)                                                                     \
+    char buff[0xFF] = "FATAL ERROR: ";                                                 \
+    snprintf(buff + 13 * sizeof(char), sizeof(buff) - 13 * sizeof(char), __VA_ARGS__); \
+    throw std::runtime_error(buff)
+
+template <typename T, int capacity>
 struct Queue {
     u8 offset = 0;
     u8 size = 0;
@@ -34,6 +34,29 @@ struct Queue {
         return val;
     }
     T head() { return data[offset]; }
+};
+
+namespace Constants {
+
+constexpr const char* TITLE = "GameBoy Emulator";
+constexpr int WIDTH = 160;
+constexpr int HEIGHT = 144;
+
+constexpr int FRAMES_PER_SEC = 0;
+
+}  // namespace Constants
+
+enum class JoypadButton : char {
+    RIGHT_BTN = 0,
+    LEFT_BTN = 1,
+    UP_BTN = 2,
+    DOWN_BTN = 3,
+    A_BTN = 4,
+    B_BTN = 5,
+    SELECT_BTN = 6,
+    START_BTN = 7,
+
+    NONE = 8,
 };
 
 namespace IOReg {

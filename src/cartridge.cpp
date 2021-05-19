@@ -1,7 +1,5 @@
 #include "cartridge.hpp"
 
-#include <cstdio>
-
 ROMOnly::ROMOnly(u8* rom) {
     for (int i = 0; i < ROM_SIZE; i++) {
         this->rom[i] = rom[i];
