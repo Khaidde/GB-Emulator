@@ -37,11 +37,11 @@ struct Fetcher {
 
     bool windowMode;
 
-    u16 tileRowAddr;
+    u8 tileX;
+
+    u16 tileRowAddrOff;
     u8 data0;
     u8 data1;
-
-    u8 tileX;
 };
 
 class PPU {
@@ -82,6 +82,9 @@ class PPU {
 
     static constexpr u16 OAM_START_ADDR = 0xFE00;
     u8* oamAddrBlock;
+
+    static constexpr u16 VRAM_START_ADDR = 0x8000;
+    u8* vramAddrBlock;
 
     using FrameBuffer = u32[160 * 144];
     bool bufferSel;
@@ -129,6 +132,7 @@ class PPU {
     u8 statIntrFlags;  // 3: ly=lyc, 2: oam, 1: v-blank, 0: h-blank
     bool statTrigger;
     int modeSwitchClocks;
+    int lylycTriggerClock;
 
     // ICE_CREAM_GB const u32 baseColors[4] = {0xFFFFF6D3, 0xFFF9A875, 0xFFEB6B6F, 0xFF7C3F58};
     // COLD_FIRE_GB const u32 baseColors[4] = {0xFFF6C6A8, 0xFFD17C7C, 0xFF5B768D, 0xFF46425E};
@@ -146,7 +150,7 @@ class PPU {
 
     bool get_lcdc_flag(LCDCFlag flag);
 
-    void set_mode(Mode m);
+    void set_mode(Mode changeToMode);
 
     u32 get_color(FIFOData&& data);
 };

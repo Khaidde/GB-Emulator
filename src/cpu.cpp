@@ -87,12 +87,12 @@ void CPU::emulate_cycle() {
         // if (PC == 0x196) {
         // if (PC == 0xff9C) {
         // if (PC >= 0x190 && memory->read(IOReg::LY_REG) == 0x98) {
-        if (PC == 0x1A7 && memory->read(IOReg::LY_REG) == 0x01) {
-            // if (PC == 0x164) {
-            // printf("%02x\n", memory->read(IOReg::LY_REG));
-            // debugger->pause_exec();
-            // test = true;
-        }
+        // if (PC == 0x1A7 && memory->read(IOReg::LY_REG) == 0x01) {
+        // if (PC == 0x48) {
+        // if (PC == 0x164) {
+        // printf("%02x\n", memory->read(IOReg::LY_REG));
+        // debugger->pause_exec();
+        // test = true;
     }
 
     if (callbackCycle > 0) {

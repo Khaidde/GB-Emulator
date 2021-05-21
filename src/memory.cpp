@@ -49,10 +49,22 @@ void Memory::load_cartridge(const char* romPath) {
 
     char title[16];
     int t = 0;
-    for (int c = 0x134; c < 0x144; c++) {
+    for (int c = 0x134; c < 0x143; c++) {
         title[t++] = rom[c];
     }
     printf("Title: %s\n", title);
+
+    /*
+     80h - Game supports CGB functions, but works on old gameboys also.
+     C0h - Game works on CGB only (physically the same as 80h).
+     */
+    if (rom[0x143] == 0x80) {
+        printf("CGB Flag: also works on old gameboys\n");
+    } else if (rom[0x143] == 0xC0) {
+        printf("CGB Flag: only works on CGB\n");
+    } else {
+        printf("CGB Flag: %02x\n", rom[0x143]);
+    }
 
     static constexpr const char* ROM_SIZES[] = {
         "32 KByte (no ROM banking)",
@@ -145,6 +157,9 @@ u8 Memory::read(u16 addr) {
     if (addr < 0x8000 || (0xA000 <= addr && addr < 0xC000)) {
         return cartridge->read(addr);
     }
+    if (ppu->is_vram_blocked() && 0x8000 <= addr && addr < 0xA000) {
+        // return 0xFF;
+    }
     if (0xFE00 <= addr && addr < 0xFF00) {
         if (dmaInProgress) {
             return addr < 0xFEA0 ? 0xFF : 0x00;
@@ -168,6 +183,9 @@ void Memory::write(u16 addr, u8 val) {
     if (addr < 0x8000 || (0xA000 <= addr && addr < 0xC000)) {
         cartridge->write(addr, val);
         return;
+    }
+    if (ppu->is_vram_blocked() && 0x8000 <= addr && addr < 0xA000) {
+        // return;
     }
     if (0xC000 <= addr && addr < 0xDE00) {
         mem[addr] = val;
@@ -245,9 +263,6 @@ void Memory::emulate_dma_cycle() {
         if (dmaCycleCnt <= 160) {
             u8 i = 160 - dmaCycleCnt;
             mem[0xFE00 + i] = read(dmaStartAddr + i);
-            if (mem[0xFE00 + i] == 0xFF) {
-                printf("!!!!\n");
-            }
             if (i == 0) {
                 dmaInProgress = true;
             }

@@ -61,8 +61,8 @@ JoypadButton get_gb_keycode(SDL_Keycode keycode) {
 }
 
 void wait_frame() {
-    SDL_Delay(10);
     // TODO wait roughly 1/60th of a second
+    SDL_Delay(10);
 }
 
 void run(Screen& screen, GameBoy& gameboy, Debugger& debugger) {
