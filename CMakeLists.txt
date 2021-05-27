@@ -16,6 +16,7 @@ find_package(SDL2 REQUIRED)
 include_directories(${PROJECT_SOURCE_DIR}/src)
 
 set(SOURCES
+    src/apu.cpp
     src/cartridge.cpp
     src/cpu.cpp
     src/debugger.cpp

@@ -12,17 +12,17 @@ struct Sprite {
 };
 
 struct SpriteList {
-    static constexpr u8 MAX_SPRITES = 10;
-    Sprite data[MAX_SPRITES];
-    u16 removedBitField = 0;
-    u8 size = 0;
-
     void clear() {
         size = 0;
         removedBitField = 0;
     }
     void add(Sprite&& sprite) { data[size++] = sprite; }
     void remove(u8 index) { removedBitField |= 1 << index; }
+
+    static constexpr u8 MAX_SPRITES = 10;
+    Sprite data[MAX_SPRITES];
+    u16 removedBitField = 0;
+    u8 size = 0;
 };
 
 struct Fetcher {
@@ -55,7 +55,7 @@ class PPU {
 
     static constexpr int TOTAL_CLOCKS = SCAN_LINE_CLOCKS * V_BLANK_END_LINE;
 
-    PPU(Memory* memory) : memory(memory) {}
+    PPU(Memory* memory);
     void restart();
     void render(u32* pixelBuffer);
     void emulate_clock();

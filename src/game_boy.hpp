@@ -1,5 +1,6 @@
 #pragma once
 
+#include "apu.hpp"
 #include "cartridge.hpp"
 #include "cpu.hpp"
 #include "debugger.hpp"
@@ -21,7 +22,7 @@ class GameBoy {
     }
 
     void handle_key_code(bool pressed, JoypadButton button) { input.handle_input(pressed, (char)button); }
-    void emulate_frame(u32* screenBuffer);
+    void emulate_frame(u32* screenBuffer, s16* sampleBuffer, u16 sampleLen);
 
    private:
     Debugger* debugger;
@@ -31,6 +32,7 @@ class GameBoy {
     Input input;
     Timer timer;
     PPU ppu;
+    APU apu;
     Memory memory;
     CPU cpu;
 };

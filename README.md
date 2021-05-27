@@ -4,12 +4,10 @@ A high-accuracy Gameboy/Gameboy Color emulator written in C++. This project is m
 
 # TODO
 
--   Working Window mode
 -   OAM bug
 -   ROM saving (traditional battery saving)
 -   Save States (emulator state save)
 -   MBC2, MBC3, MBC5
--   APU
 -   Support CGB (Gameboy Color)
 -   Command-line parser
 

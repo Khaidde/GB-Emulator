@@ -1,6 +1,11 @@
 #include "input.hpp"
 #include "memory.hpp"
 
+void Input::restart() {
+    keyState = 0xFF;
+    memory->ref(IOReg::JOYP_REG) = 0xCF;
+}
+
 void Input::handle_input(bool pressed, u8 key) {
     u8 keyBit = 1 << key;
 
@@ -24,16 +29,3 @@ u8 Input::get_key_state(u8 keyReg) {
     }
     return upKeyReg;
 }
-/*
-u8 Input::get_key_state(bool btnSelect, bool dirSelect) {
-    u8 keysReg = 0xC0 | (!btnSelect << 5) | (!dirSelect << 4);
-    if (!btnSelect) {
-        keysReg |= keyState >> 4;
-    } else if (!dirSelect) {
-        keysReg |= keyState & 0xF;
-    } else {
-        keysReg |= 0xF;
-    }
-    return keysReg;
-}
-*/

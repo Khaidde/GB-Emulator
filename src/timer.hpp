@@ -6,7 +6,7 @@ class Memory;
 
 class Timer {
    public:
-    Timer(Memory* memory) : memory(memory) {}
+    Timer(Memory* memory);
     void restart();
     void emulate_clock();
 

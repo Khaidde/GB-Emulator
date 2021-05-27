@@ -2,10 +2,16 @@
 
 #include "memory.hpp"
 
-void Timer::restart() {
-    this->memory = memory;
+Timer::Timer(Memory* memory) : memory(memory) {
     div = &memory->ref(IOReg::DIV_REG);
     tima = &memory->ref(IOReg::TIMA_REG);
+}
+
+void Timer::restart() {
+    *tima = 0x00;
+    memory->ref(IOReg::TMA_REG) = 0x00;
+    memory->ref(IOReg::TAC_REG) = 0xF8;
+
     clocks = 0xABCC;
     timaScheduled = false;
 

@@ -2,7 +2,7 @@
 
 #include "game_boy.hpp"
 
-void PPU::restart() {
+PPU::PPU(Memory* memory) : memory(memory) {
     lcdc = &memory->ref(IOReg::LCDC_REG);
     stat = &memory->ref(IOReg::STAT_REG);
     scy = &memory->ref(IOReg::SCY_REG);
@@ -14,6 +14,17 @@ void PPU::restart() {
 
     oamAddrBlock = &memory->ref(OAM_START_ADDR);
     vramAddrBlock = &memory->ref(VRAM_START_ADDR);
+}
+
+void PPU::restart() {
+    *lcdc = 0x91;
+    *stat = 0x85;  // ppu mode should be 1 (v_blank)
+    *scy = 0x00;
+    *scx = 0x00;
+    *lyc = 0x00;
+    memory->ref(IOReg::BGP_REG) = 0xFC;
+    *wy = 0x00;
+    *wx = 0x00;
 
     bufferSel = false;
     for (int i = 0; i < Constants::WIDTH * Constants::HEIGHT; i++) {

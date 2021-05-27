@@ -8,6 +8,7 @@ using u16 = uint16_t;
 using u32 = uint32_t;
 
 using s8 = int8_t;
+using s16 = int16_t;
 
 #define fatal(...)                                                                     \
     char buff[0xFF] = "FATAL ERROR: ";                                                 \
@@ -16,10 +17,6 @@ using s8 = int8_t;
 
 template <typename T, int capacity>
 struct Queue {
-    u8 offset = 0;
-    u8 size = 0;
-    T data[capacity];
-
     void clear() {
         offset = 0;
         size = 0;
@@ -34,6 +31,10 @@ struct Queue {
         return val;
     }
     T head() { return data[offset]; }
+
+    u8 offset = 0;
+    u8 size = 0;
+    T data[capacity];
 };
 
 namespace Constants {
@@ -41,8 +42,6 @@ namespace Constants {
 constexpr const char* TITLE = "GameBoy Emulator";
 constexpr int WIDTH = 160;
 constexpr int HEIGHT = 144;
-
-constexpr int FRAMES_PER_SEC = 0;
 
 }  // namespace Constants
 
@@ -74,7 +73,29 @@ enum : u16 {
     TMA_REG = 0xFF06,
     TAC_REG = 0xFF07,
 
+    // Interrupt flags
     IF_REG = 0xFF0F,
+
+    // Sound registers
+    NR10_REG = 0xFF10,
+    NR11_REG = 0xFF11,
+    NR12_REG = 0xFF12,
+    NR13_REG = 0xFF13,
+    NR14_REG = 0xFF14,
+
+    NR21_REG = 0xFF16,
+    NR22_REG = 0xFF17,
+    NR23_REG = 0xFF18,
+    NR24_REG = 0xFF19,
+
+    NR41_REG = 0xFF20,
+    NR42_REG = 0xFF21,
+    NR43_REG = 0xFF22,
+    NR44_REG = 0xFF23,
+
+    NR50_REG = 0xFF24,
+    NR51_REG = 0xFF25,
+    NR52_REG = 0xFF26,
 
     // LCD Control
     LCDC_REG = 0xFF40,

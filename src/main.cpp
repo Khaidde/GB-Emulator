@@ -11,6 +11,7 @@ struct Screen {
     SDL_Renderer* renderer;
 
     int pitch = 0;
+    u32* pixelBuffer;
     SDL_Texture* bufferTexture;
 };
 
@@ -60,29 +61,22 @@ JoypadButton get_gb_keycode(SDL_Keycode keycode) {
     }
 }
 
-void wait_frame() {
-    // TODO wait roughly 1/60th of a second
-    SDL_Delay(10);
-}
+constexpr int MS_PER_FRAME = 16;
+
+constexpr u16 SAMPLE_SIZE = 2048;
+constexpr u16 SAMPLE_RATE = 44100;
+constexpr double SAMPLES_PER_FRAME = SAMPLE_RATE / (1000.0 / MS_PER_FRAME);
+constexpr double FLOATING_OFF = SAMPLES_PER_FRAME - (int)SAMPLES_PER_FRAME;
+double frameAcc = 0;
 
 void run(Screen& screen, GameBoy& gameboy, Debugger& debugger) {
     SDL_Event e;
     bool running = true;
+
+    s16 sampleBuffer[SAMPLE_SIZE];
+
+    long nextFrame = SDL_GetTicks();
     while (running) {
-        SDL_RenderClear(screen.renderer);
-
-        u32* pixelBuffer;
-        if (SDL_LockTexture(screen.bufferTexture, nullptr, (void**)&pixelBuffer, &screen.pitch)) {
-            fatal("Failed to lock texture! SDL_error: %s\n", SDL_GetError());
-        }
-        screen.pitch /= sizeof(u32);
-        gameboy.emulate_frame(pixelBuffer);
-
-        SDL_UnlockTexture(screen.bufferTexture);
-
-        SDL_RenderCopy(screen.renderer, screen.bufferTexture, nullptr, nullptr);
-        SDL_RenderPresent(screen.renderer);
-
         while (SDL_PollEvent(&e)) {
             switch (e.type) {
                 case SDL_QUIT:
@@ -106,7 +100,33 @@ void run(Screen& screen, GameBoy& gameboy, Debugger& debugger) {
             break;
         }
 
-        wait_frame();
+        SDL_RenderClear(screen.renderer);
+
+        if (SDL_LockTexture(screen.bufferTexture, nullptr, (void**)&screen.pixelBuffer, &screen.pitch)) {
+            fatal("Failed to lock texture! SDL_error: %s\n", SDL_GetError());
+        }
+        screen.pitch /= sizeof(u32);
+
+        frameAcc += FLOATING_OFF;
+        int inc = 0;
+        if (frameAcc >= 1) {
+            inc = 1;
+        }
+        int sampleLen = ((int)SAMPLES_PER_FRAME + inc) * 2;
+        gameboy.emulate_frame(screen.pixelBuffer, sampleBuffer, sampleLen);
+        SDL_QueueAudio(1, sampleBuffer, sampleLen * sizeof(u16));
+        frameAcc -= inc;
+
+        SDL_UnlockTexture(screen.bufferTexture);
+
+        SDL_RenderCopy(screen.renderer, screen.bufferTexture, nullptr, nullptr);
+        SDL_RenderPresent(screen.renderer);
+
+        nextFrame += MS_PER_FRAME;
+        int delay = nextFrame - SDL_GetTicks();
+        if (delay > 0) {
+            SDL_Delay(delay);
+        }
     }
 }
 
@@ -117,7 +137,20 @@ int main(int argc, char** argv) {
         fprintf(stderr, "Usage: gbemu [romPath.gb]");
         return 1;
     }
-    SDL_Init(SDL_INIT_VIDEO);
+    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
+
+    // AUDIO Test
+    SDL_AudioSpec spec;
+    spec.freq = SAMPLE_RATE;  // Sample rate
+    spec.format = AUDIO_S16SYS;
+    spec.channels = 2;
+    spec.samples = SAMPLE_SIZE;  // Buffer size -> TODO verify that this is fine
+    spec.callback = nullptr;
+
+    if (SDL_OpenAudio(&spec, 0) != 0) {
+        fprintf(stderr, "Could not open audio\n");
+    }
+    SDL_PauseAudio(0);
 
     GameBoy gameboy;
 
@@ -138,6 +171,7 @@ int main(int argc, char** argv) {
     }
 
     destroy_screen(screen);
+    SDL_CloseAudio();
 
     SDL_Quit();
     return 0;

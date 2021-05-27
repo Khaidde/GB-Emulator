@@ -15,21 +15,8 @@ void Memory::restart() {
     for (int i = 0xFF00; i < 0x10000; i++) {
         mem[i] = 0xFF;
     }
-    mem[IOReg::JOYP_REG] = 0xCF;
     mem[IOReg::SB_REG] = 0x00;
     mem[IOReg::SC_REG] = 0x7E;
-    mem[IOReg::TIMA_REG] = 0x00;
-    mem[IOReg::TMA_REG] = 0x00;
-    mem[IOReg::TAC_REG] = 0xF8;
-
-    mem[IOReg::LCDC_REG] = 0x91;
-    mem[IOReg::STAT_REG] = 0x85;  // ppu mode should be 1 (v_blank)
-    mem[IOReg::SCY_REG] = 0x00;
-    mem[IOReg::SCX_REG] = 0x00;
-    mem[IOReg::LYC_REG] = 0x00;
-    mem[IOReg::BGP_REG] = 0xFC;
-    mem[IOReg::WY_REG] = 0x00;
-    mem[IOReg::WX_REG] = 0x00;
 
     mem[IOReg::IF_REG] = 0xE1;
     mem[IOReg::IE_REG] = 0x00;
@@ -222,6 +209,62 @@ void Memory::write(u16 addr, u8 val) {
             timer->set_enable((val >> 2) & 0x1);
             timer->set_frequency(val & 0x3);
             mem[addr] = 0xF8 | (val & 0x7);
+            break;
+        case IOReg::NR10_REG:
+            mem[addr] = val;
+            apu->update_nr1x(0, val);
+            break;
+        case IOReg::NR11_REG:
+            mem[addr] = val;
+            apu->update_nr1x(1, val);
+            break;
+        case IOReg::NR12_REG:
+            mem[addr] = val;
+            apu->update_nr1x(2, val);
+            break;
+        case IOReg::NR13_REG:
+            mem[addr] = val;
+            apu->update_nr1x(3, val);
+            break;
+        case IOReg::NR14_REG:
+            mem[addr] = val;
+            apu->update_nr1x(4, val);
+            break;
+        case IOReg::NR21_REG:
+            mem[addr] = val;
+            apu->update_nr2x(1, val);
+            break;
+        case IOReg::NR22_REG:
+            mem[addr] = val;
+            apu->update_nr2x(2, val);
+            break;
+        case IOReg::NR23_REG:
+            mem[addr] = val;
+            apu->update_nr2x(3, val);
+            break;
+        case IOReg::NR24_REG:
+            mem[addr] = val;
+            apu->update_nr2x(4, val);
+            break;
+        case IOReg::NR41_REG:
+            mem[addr] = val;
+            apu->update_nr4x(1, val);
+            break;
+        case IOReg::NR42_REG:
+            mem[addr] = val;
+            apu->update_nr4x(2, val);
+            break;
+        case IOReg::NR43_REG:
+            mem[addr] = val;
+            apu->update_nr4x(3, val);
+            break;
+        case IOReg::NR44_REG:
+            mem[addr] = val;
+            apu->update_nr4x(4, val);
+            break;
+        case IOReg::NR50_REG:
+            mem[addr] = val;
+            apu->update_lr_enable(val);
             break;
         case IOReg::LCDC_REG:
             if ((val & (1 << 7)) == 0) mem[IOReg::LY_REG] = 0;

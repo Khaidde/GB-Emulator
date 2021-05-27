@@ -1,5 +1,6 @@
 #pragma once
 
+#include "apu.hpp"
 #include "cartridge.hpp"
 #include "debugger.hpp"
 #include "input.hpp"
@@ -12,6 +13,7 @@
 class Debugger;
 class Timer;
 class PPU;
+class APU;
 
 struct MemoryOp {
     u8 cycle;
@@ -32,6 +34,7 @@ class Memory {
     void set_input(Input& input) { this->input = &input; }
     void set_timer(Timer& timer) { this->timer = &timer; }
     void set_ppu(PPU& ppu) { this->ppu = &ppu; }
+    void set_apu(APU& apu) { this->apu = &apu; }
 
     void load_cartridge(const char* romPath);
 
@@ -57,6 +60,7 @@ class Memory {
     Input* input;
     Timer* timer;
     PPU* ppu;
+    APU* apu;
 
     static constexpr int MEMORY_SIZE = 0x10000;
     u8 mem[MEMORY_SIZE];
