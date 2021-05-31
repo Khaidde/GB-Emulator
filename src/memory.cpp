@@ -12,9 +12,6 @@ Memory::Memory() {
 }
 
 void Memory::restart() {
-    for (int i = 0xFF00; i < 0x10000; i++) {
-        mem[i] = 0xFF;
-    }
     mem[IOReg::SB_REG] = 0x00;
     mem[IOReg::SC_REG] = 0x7E;
 
@@ -145,6 +142,7 @@ u8 Memory::read(u16 addr) {
         return cartridge->read(addr);
     }
     if (ppu->is_vram_blocked() && 0x8000 <= addr && addr < 0xA000) {
+        // TODO deal with vram blocking
         // return 0xFF;
     }
     if (0xFE00 <= addr && addr < 0xFF00) {
@@ -155,6 +153,21 @@ u8 Memory::read(u16 addr) {
             return 0xFF;
         }
         return mem[addr];
+    }
+    if (0xFF03 == addr) {
+        return 0xFF;
+    }
+    if (0xFF08 <= addr && addr <= 0xFF0E) {
+        return 0xFF;
+    }
+    if (0xFF10 <= addr && addr <= 0xFF26) {
+        return apu->read_register(mem[addr], addr & 0xFF);
+    }
+    if (0xFF27 <= addr && addr <= 0xFF30) {
+        return 0xFF;
+    }
+    if (0xFF4C <= addr && addr <= 0xFF7F) {
+        return 0xFF;
     }
     switch (addr) {
         case IOReg::JOYP_REG:
@@ -172,7 +185,7 @@ void Memory::write(u16 addr, u8 val) {
         return;
     }
     if (ppu->is_vram_blocked() && 0x8000 <= addr && addr < 0xA000) {
-        // return;
+        return;
     }
     if (0xC000 <= addr && addr < 0xDE00) {
         mem[addr] = val;
@@ -188,8 +201,14 @@ void Memory::write(u16 addr, u8 val) {
             }
         }
         if (ppu->is_oam_blocked()) {
+            printf("???%04x\n", addr);
             return;
         }
+    }
+    if (0xFF10 <= addr && addr <= 0xFF26) {
+        apu->write_register(addr & 0xFF, val);
+        mem[addr] = val;
+        return;
     }
     switch (addr) {
         case IOReg::JOYP_REG:
@@ -209,62 +228,6 @@ void Memory::write(u16 addr, u8 val) {
             timer->set_enable((val >> 2) & 0x1);
             timer->set_frequency(val & 0x3);
             mem[addr] = 0xF8 | (val & 0x7);
-            break;
-        case IOReg::NR10_REG:
-            mem[addr] = val;
-            apu->update_nr1x(0, val);
-            break;
-        case IOReg::NR11_REG:
-            mem[addr] = val;
-            apu->update_nr1x(1, val);
-            break;
-        case IOReg::NR12_REG:
-            mem[addr] = val;
-            apu->update_nr1x(2, val);
-            break;
-        case IOReg::NR13_REG:
-            mem[addr] = val;
-            apu->update_nr1x(3, val);
-            break;
-        case IOReg::NR14_REG:
-            mem[addr] = val;
-            apu->update_nr1x(4, val);
-            break;
-        case IOReg::NR21_REG:
-            mem[addr] = val;
-            apu->update_nr2x(1, val);
-            break;
-        case IOReg::NR22_REG:
-            mem[addr] = val;
-            apu->update_nr2x(2, val);
-            break;
-        case IOReg::NR23_REG:
-            mem[addr] = val;
-            apu->update_nr2x(3, val);
-            break;
-        case IOReg::NR24_REG:
-            mem[addr] = val;
-            apu->update_nr2x(4, val);
-            break;
-        case IOReg::NR41_REG:
-            mem[addr] = val;
-            apu->update_nr4x(1, val);
-            break;
-        case IOReg::NR42_REG:
-            mem[addr] = val;
-            apu->update_nr4x(2, val);
-            break;
-        case IOReg::NR43_REG:
-            mem[addr] = val;
-            apu->update_nr4x(3, val);
-            break;
-        case IOReg::NR44_REG:
-            mem[addr] = val;
-            apu->update_nr4x(4, val);
-            break;
-        case IOReg::NR50_REG:
-            mem[addr] = val;
-            apu->update_lr_enable(val);
             break;
         case IOReg::LCDC_REG:
             if ((val & (1 << 7)) == 0) mem[IOReg::LY_REG] = 0;

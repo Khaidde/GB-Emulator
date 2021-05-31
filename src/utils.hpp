@@ -42,6 +42,7 @@ namespace Constants {
 constexpr const char* TITLE = "GameBoy Emulator";
 constexpr int WIDTH = 160;
 constexpr int HEIGHT = 144;
+constexpr double MS_PER_FRAME = 16.7427;
 
 }  // namespace Constants
 
@@ -88,6 +89,12 @@ enum : u16 {
     NR23_REG = 0xFF18,
     NR24_REG = 0xFF19,
 
+    NR30_REG = 0xFF1A,
+    NR31_REG = 0xFF1B,
+    NR32_REG = 0xFF1C,
+    NR33_REG = 0xFF1D,
+    NR34_REG = 0xFF1E,
+
     NR41_REG = 0xFF20,
     NR42_REG = 0xFF21,
     NR43_REG = 0xFF22,
@@ -96,6 +103,8 @@ enum : u16 {
     NR50_REG = 0xFF24,
     NR51_REG = 0xFF25,
     NR52_REG = 0xFF26,
+
+    WAVE_TABLE_START_REG = 0xFF30,
 
     // LCD Control
     LCDC_REG = 0xFF40,

@@ -61,11 +61,9 @@ JoypadButton get_gb_keycode(SDL_Keycode keycode) {
     }
 }
 
-constexpr int MS_PER_FRAME = 16;
-
 constexpr u16 SAMPLE_SIZE = 2048;
 constexpr u16 SAMPLE_RATE = 44100;
-constexpr double SAMPLES_PER_FRAME = SAMPLE_RATE / (1000.0 / MS_PER_FRAME);
+constexpr double SAMPLES_PER_FRAME = SAMPLE_RATE / (1000.0 / Constants::MS_PER_FRAME);
 constexpr double FLOATING_OFF = SAMPLES_PER_FRAME - (int)SAMPLES_PER_FRAME;
 double frameAcc = 0;
 
@@ -75,7 +73,7 @@ void run(Screen& screen, GameBoy& gameboy, Debugger& debugger) {
 
     s16 sampleBuffer[SAMPLE_SIZE];
 
-    long nextFrame = SDL_GetTicks();
+    double nextFrame = SDL_GetTicks();
     while (running) {
         while (SDL_PollEvent(&e)) {
             switch (e.type) {
@@ -122,8 +120,8 @@ void run(Screen& screen, GameBoy& gameboy, Debugger& debugger) {
         SDL_RenderCopy(screen.renderer, screen.bufferTexture, nullptr, nullptr);
         SDL_RenderPresent(screen.renderer);
 
-        nextFrame += MS_PER_FRAME;
-        int delay = nextFrame - SDL_GetTicks();
+        nextFrame += Constants::MS_PER_FRAME;
+        double delay = nextFrame - SDL_GetTicks();
         if (delay > 0) {
             SDL_Delay(delay);
         }

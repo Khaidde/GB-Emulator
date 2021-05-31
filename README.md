@@ -1,6 +1,6 @@
 # GB-Emulator
 
-A high-accuracy Gameboy/Gameboy Color emulator written in C++. This project is mainly meant to be a learning exercise in C++ and assembly. There are a ton of other gameboy emulators such as Gambatte, BGB and SameBoy which have better UIs, debuggers, and accuracy. I just thought creating my own emulator would be more fun.
+A Gameboy/Gameboy Color emulator aimed at accuracy. This project is meant to be a learning exercise in C++. There are a ton of other gameboy emulators such as Gambatte, BGB and SameBoy which have better UIs, debuggers, and accuracy. I am doing this as a fun side project.
 
 # TODO
 
@@ -29,11 +29,11 @@ A high-accuracy Gameboy/Gameboy Color emulator written in C++. This project is m
 
 ### bits
 
-| Test           | Passed | Note                    |
-| -------------- | :----: | ----------------------- |
-| mem_oam        |   x    |                         |
-| reg_f          |   x    |                         |
-| unused_hwio-GS |        | APU IO registers (FF10) |
+| Test           | Passed | Note |
+| -------------- | :----: | ---- |
+| mem_oam        |        |      |
+| reg_f          |   x    |      |
+| unused_hwio-GS |   x    |      |
 
 ### instr
 
@@ -59,7 +59,7 @@ A high-accuracy Gameboy/Gameboy Color emulator written in C++. This project is m
 
 | Test                        | Passed | Note            |
 | --------------------------- | :----: | --------------- |
-| hblank_ly_scx_timing-GS     |        |                 |
+| hblank_ly_scx_timing-GS     |   x    |                 |
 | intr_1_2_timing-GS          |   x    |                 |
 | intr_2_0_timing             |   x    |                 |
 | intr_2_mode0_timing         |   x    |                 |
@@ -74,39 +74,39 @@ A high-accuracy Gameboy/Gameboy Color emulator written in C++. This project is m
 
 ### acceptance
 
-| Test                    | Passed | Note                    |
-| ----------------------- | :----: | ----------------------- |
-| add_sp_e_timing         |   x    |                         |
-| boot_div-dmgABCmgb      |   x    |                         |
-| boot_hwio-dmgABCmgb     |        | APU IO registers (FF10) |
-| boot_regs-dmgABC        |   x    |                         |
-| call_cc_timing          |   x    |                         |
-| call_cc_timing2         |   x    |                         |
-| call_timing             |   x    |                         |
-| call_timing2            |   x    |                         |
-| di_timing-GS            |   x    |                         |
-| div_timing              |   x    |                         |
-| ei_sequence             |   x    |                         |
-| halt_ime0_ei            |   x    |                         |
-| halt_ime0_nointr_timing |   x    |                         |
-| halt_ime1_timing        |   x    |                         |
-| halt_ime1_timing2-GS    |   x    |                         |
-| if_ie_registers         |   x    |                         |
-| intr_timing             |   x    |                         |
-| jp_cc_timing            |   x    |                         |
-| jp_timing               |   x    |                         |
-| ld_hl_sp_e_timing       |   x    |                         |
-| oam_dma_restart         |   x    |                         |
-| oam_dma_start           |   x    |                         |
-| oam_dma_timing          |   x    |                         |
-| pop_timing              |   x    |                         |
-| push_timing             |   x    |                         |
-| rapid_di_ei             |   x    |                         |
-| ret_cc_timing           |   x    |                         |
-| ret_timing              |   x    |                         |
-| reti_intr_timing        |   x    |                         |
-| reti_timing             |   x    |                         |
-| rst_timing              |   x    |                         |
+| Test                    | Passed | Note |
+| ----------------------- | :----: | ---- |
+| add_sp_e_timing         |   x    |      |
+| boot_div-dmgABCmgb      |   x    |      |
+| boot_hwio-dmgABCmgb     |   x    |      |
+| boot_regs-dmgABC        |   x    |      |
+| call_cc_timing          |   x    |      |
+| call_cc_timing2         |   x    |      |
+| call_timing             |   x    |      |
+| call_timing2            |   x    |      |
+| di_timing-GS            |   x    |      |
+| div_timing              |   x    |      |
+| ei_sequence             |   x    |      |
+| halt_ime0_ei            |   x    |      |
+| halt_ime0_nointr_timing |   x    |      |
+| halt_ime1_timing        |   x    |      |
+| halt_ime1_timing2-GS    |   x    |      |
+| if_ie_registers         |   x    |      |
+| intr_timing             |   x    |      |
+| jp_cc_timing            |   x    |      |
+| jp_timing               |   x    |      |
+| ld_hl_sp_e_timing       |   x    |      |
+| oam_dma_restart         |   x    |      |
+| oam_dma_start           |   x    |      |
+| oam_dma_timing          |   x    |      |
+| pop_timing              |   x    |      |
+| push_timing             |   x    |      |
+| rapid_di_ei             |   x    |      |
+| ret_cc_timing           |   x    |      |
+| ret_timing              |   x    |      |
+| reti_intr_timing        |   x    |      |
+| reti_timing             |   x    |      |
+| rst_timing              |   x    |      |
 
 ### mbc1
 

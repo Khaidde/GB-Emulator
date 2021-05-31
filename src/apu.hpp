@@ -15,21 +15,21 @@ struct SampleQueue {
 
     static constexpr short CAPACITY = 2048;
     u16 offset = 0;
-    u16 size = 0;
+    u32 size = 0;
     s16 data[CAPACITY];
 };
 
+template <int maxLoad>
 class LengthCounter {
    public:
     void set_disable_target(bool& enabled);
     void set_length_enabled(bool enabled);
+    void set_load(u8 lengthLoad);
 
-    template <int maxLoad>
-    void set_load(u8 lengthLoad) {
-        cycleLen = maxLoad - lengthLoad;
-    }
     void trigger();
     void emulate_clock();
+
+    bool is_active();
 
    private:
     bool* enabled;
@@ -42,7 +42,7 @@ class LengthCounter {
 
 class VolumeEnvelope {
    public:
-    void set_nrx2(u8 regVal);
+    void write_volume_registers(u8 val);
 
     void trigger();
     void emulate_clock();
@@ -54,33 +54,88 @@ class VolumeEnvelope {
     u8 startingVolume;
     bool volumeAddMode;
 
-    u16 clockCnt = 0;
-    u16 clockLen = 0;
+    u16 envelopeCnt = 0;
+    u8 clockLen = 0;
 };
 
 class SquareChannel {
    public:
     SquareChannel();
-    void set_dac_enable(bool dacEnabled);
-    void set_frequency(u16 freq);
-    void set_duty(u8 duty);
+    void write_registers(char regType, u8 val);
+    void update_frequency();
 
-    void trigger_event();
+    void emulate_sweep_clock();
+    void emulate_length_clock();
+    void emulate_volume_clock();
     void emulate_clock();
 
-    u8 get_out_vol() { return outVol; }
+    bool is_length_active();
 
-    LengthCounter lengthCounter;
-    VolumeEnvelope volumeEnvelope;
+    u8 get_left_vol();
+    u8 get_right_vol();
+
+    bool leftEnable;
+    bool rightEnable;
 
    private:
     bool enabled = false;
     bool dacEnabled = false;
 
+    u8 sweepClockCnt = 0;
+    u8 sweepClockLen = 0;
+    bool negate;
+    u8 sweepShift;
+    bool sweepEnabled;
+    u16 shadowFrequency;
+
+    LengthCounter<64> lengthCounter;
+    VolumeEnvelope volumeEnvelope;
+
     u8 cycleIndex = 0;
     u16 clockCnt = 0;
     u16 clockLen = 0;
     u8 dutyOff;
+
+    u8 freqMSB;
+    u8 freqLSB;
+    u16 frequency;
+
+    u8 outVol;
+};
+
+class WaveChannel {
+   public:
+    WaveChannel();
+    void set_samples(u8* samples);
+    void write_registers(char regType, u8 val);
+    void update_frequency();
+
+    void emulate_length_clock();
+    void emulate_clock();
+
+    bool is_length_active();
+
+    u8 get_left_vol();
+    u8 get_right_vol();
+
+    bool leftEnable;
+    bool rightEnable;
+
+   private:
+    bool enabled;
+    bool dacEnabled;
+
+    LengthCounter<256> lengthCounter;
+
+    u8 shiftVol;
+
+    u16 clockCnt = 0;
+    u16 clockLen = 0;
+    u8 sampleIndex = 0;
+    u8* samples;
+
+    u8 freqMSB;
+    u8 freqLSB;
 
     u8 outVol;
 };
@@ -88,24 +143,31 @@ class SquareChannel {
 class NoiseChannel {
    public:
     NoiseChannel();
-    void set_dac_enable(bool dacEnabled);
-    void set_nr43(u8 regVal);
+    void write_registers(char regType, u8 val);
 
-    void trigger_event();
+    void emulate_length_clock();
+    void emulate_volume_clock();
     void emulate_clock();
 
-    u8 get_out_vol() { return outVol; }
+    bool is_length_active();
 
-    LengthCounter lengthCounter;
-    VolumeEnvelope volumeEnvelope;
+    u8 get_left_vol();
+    u8 get_right_vol();
+
+    bool leftEnable;
+    bool rightEnable;
 
    private:
     bool enabled = false;
     bool dacEnabled = false;
 
+    LengthCounter<64> lengthCounter;
+    VolumeEnvelope volumeEnvelope;
+
     u16 clockCnt = 0;
     u16 clockLen = 0;
     bool widthMode;
+    bool clockEnabled;
     u16 lsfr = 0x7FFF;
 
     u8 outVol;
@@ -118,41 +180,20 @@ class APU {
     void sample(s16* sampleBuffer, u16 sampleLen);
     void emulate_clock();
 
-    void update_nr1x(u8 x, u8 val);
-    void update_nr2x(u8 x, u8 val);
-
-    void update_nr4x(u8 x, u8 val);
-
-    void update_lr_enable(u8 lrEnableRegister);
+    u8 read_register(u8 originalVal, u8 ioReg);
+    void write_register(u8 ioReg, u8 val);
 
    private:
     Memory* memory;
 
-    // Square 1
-    u8* nr10;  // -PPP NSSS Sweep period, negate, shift
-    u8* nr11;  // DDLL LLLL Duty, Length load
-    u8* nr12;  // VVVV APPP Starting volume, Envelope add mode, period
-    u8* nr13;  // FFFF FFFF Frequency LSB
-    u8* nr14;  // TL-- -FFF Trigger, Length enable, Frequency MSB
-
-    // Square 2
-    u8* nr21;  // DDLL LLLL Duty, Length load
-    u8* nr22;  // VVVV APPP Starting volume, Envelope add mode, period
-    u8* nr23;  // FFFF FFFF Frequency LSB
-    u8* nr24;  // TL-- -FFF Trigger, Length enable, Frequency MSB
-
-    // Master control
-    u8* nr50;  // ALLL BRRR Vin L enable, Left vol, Vin R enable, Right vol
-    u8* nr51;  // NW21 NW21 Left enables, Right enables
-    u8* nr52;  // P--- NW21 Power control, Channel length statuses
-
     short frameSequenceClocks;
     char frameSequenceStep;
+    double downSampleCnt;
     SampleQueue sampleQueue;
 
     SquareChannel square1;
     SquareChannel square2;
-
+    WaveChannel wave;
     NoiseChannel noise;
 
     u8 leftVol;
