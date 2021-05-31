@@ -56,8 +56,9 @@ static int spriteCount = 0;
 void PPU::emulate_clock() {
     if (!get_lcdc_flag(LCDCFlag::LCD_ENABLE)) {
         drawClocks = 0;
-        mode = Mode::H_BLANK;
-        *stat = (*stat & 0xFC) | 2;
+        mode = Mode::OAM_SEARCH;
+        *stat = (*stat & 0xFC) | 0;
+        *ly = 0;
         statIntrFlags = 0;
         return;
     }

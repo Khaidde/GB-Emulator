@@ -30,7 +30,6 @@ void CPU::handle_interrupts() {
         if (ime) {
             for (int i = 0; i < 5; i++) {
                 if (interrupts & (1 << i)) {
-                    // printf("Interrupt! %02x from %02x\n", i * 0x8 + 0x40, PC);
                     push(PC);
                     PC = i * 0x8 + 0x40;
 
@@ -93,6 +92,10 @@ void CPU::emulate_cycle() {
         // printf("%02x\n", memory->read(IOReg::LY_REG));
         // debugger->pause_exec();
         // test = true;
+        if (PC == 0x47F0) {
+            // debugger->pause_exec();
+            // test = true;
+        }
     }
 
     if (callbackCycle > 0) {

@@ -321,9 +321,7 @@ void APU::sample(s16* sampleBuffer, u16 sampleLen) {
     }
 }
 
-constexpr double MASTER_VOLUME = 3;
-constexpr u16 SAMPLE_RATE = 44100;
-constexpr double CLOCKS_PER_SAMPLE = 70224.0 / (SAMPLE_RATE / (1000.0 / Constants::MS_PER_FRAME));
+constexpr double CLOCKS_PER_SAMPLE = 70224.0 / (Constants::SAMPLE_RATE / (1000.0 / Constants::MS_PER_FRAME));
 void APU::emulate_clock() {
     frameSequenceClocks++;
     if (frameSequenceClocks == 8192) {
@@ -358,14 +356,14 @@ void APU::emulate_clock() {
         mixedLeftVol += square2.get_left_vol();
         mixedLeftVol += wave.get_left_vol();
         mixedLeftVol += noise.get_left_vol();
-        sampleQueue.enqueue(MASTER_VOLUME * mixedLeftVol * leftVol);
+        sampleQueue.enqueue(Constants::MASTER_VOLUME * mixedLeftVol * leftVol);
 
         u16 mixedRightVol = 0;
         mixedRightVol += square1.get_right_vol();
         mixedRightVol += square2.get_right_vol();
         mixedRightVol += wave.get_right_vol();
         mixedRightVol += noise.get_right_vol();
-        sampleQueue.enqueue(MASTER_VOLUME * mixedRightVol * rightVol);
+        sampleQueue.enqueue(Constants::MASTER_VOLUME * mixedRightVol * rightVol);
     }
     downSampleCnt++;
 }

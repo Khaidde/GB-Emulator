@@ -142,8 +142,8 @@ u8 Memory::read(u16 addr) {
         return cartridge->read(addr);
     }
     if (ppu->is_vram_blocked() && 0x8000 <= addr && addr < 0xA000) {
-        // TODO deal with vram blocking
-        // return 0xFF;
+        // printf("Attempt to read vram during mode 3\n");
+        return 0xFF;
     }
     if (0xFE00 <= addr && addr < 0xFF00) {
         if (dmaInProgress) {
@@ -185,6 +185,7 @@ void Memory::write(u16 addr, u8 val) {
         return;
     }
     if (ppu->is_vram_blocked() && 0x8000 <= addr && addr < 0xA000) {
+        // printf("Attempt to write to vram during mode 3\n");
         return;
     }
     if (0xC000 <= addr && addr < 0xDE00) {
@@ -201,7 +202,6 @@ void Memory::write(u16 addr, u8 val) {
             }
         }
         if (ppu->is_oam_blocked()) {
-            printf("???%04x\n", addr);
             return;
         }
     }

@@ -61,9 +61,26 @@ JoypadButton get_gb_keycode(SDL_Keycode keycode) {
     }
 }
 
+JoypadButton get_gb_joybuttoncode(u8 button) {
+    switch (button) {
+        case 0:
+            return JoypadButton::B_BTN;
+        case 1:
+            return JoypadButton::A_BTN;
+        case 6:
+            return JoypadButton::SELECT_BTN;
+        case 7:
+            return JoypadButton::START_BTN;
+        default:
+            return JoypadButton::NONE;
+    }
+}
+
+SDL_Joystick* gameController;
+constexpr s16 JOYSTICK_DEAD_ZONE = 4000;
+
 constexpr u16 SAMPLE_SIZE = 2048;
-constexpr u16 SAMPLE_RATE = 44100;
-constexpr double SAMPLES_PER_FRAME = SAMPLE_RATE / (1000.0 / Constants::MS_PER_FRAME);
+constexpr double SAMPLES_PER_FRAME = Constants::SAMPLE_RATE / (1000.0 / Constants::MS_PER_FRAME);
 constexpr double FLOATING_OFF = SAMPLES_PER_FRAME - (int)SAMPLES_PER_FRAME;
 double frameAcc = 0;
 
@@ -94,8 +111,48 @@ void run(Screen& screen, GameBoy& gameboy, Debugger& debugger) {
                     JoypadButton key = get_gb_keycode(e.key.keysym.sym);
                     if (key != JoypadButton::NONE) gameboy.handle_key_code(true, key);
                 } break;
+                case SDL_JOYBUTTONUP: {
+                    JoypadButton key = get_gb_joybuttoncode(e.jbutton.button);
+                    if (key != JoypadButton::NONE) gameboy.handle_key_code(false, key);
+                } break;
+                case SDL_JOYBUTTONDOWN: {
+                    JoypadButton key = get_gb_joybuttoncode(e.jbutton.button);
+                    if (key != JoypadButton::NONE) gameboy.handle_key_code(true, key);
+                } break;
+                case SDL_JOYHATMOTION:
+                    gameboy.handle_key_code((e.jhat.value & 0x1) != 0, JoypadButton::UP_BTN);
+                    gameboy.handle_key_code((e.jhat.value & 0x2) != 0, JoypadButton::RIGHT_BTN);
+                    gameboy.handle_key_code((e.jhat.value & 0x4) != 0, JoypadButton::DOWN_BTN);
+                    gameboy.handle_key_code((e.jhat.value & 0x8) != 0, JoypadButton::LEFT_BTN);
+                    break;
+                case SDL_JOYAXISMOTION:
+                    if (e.jaxis.axis == 0) {
+                        if (e.jaxis.value < -JOYSTICK_DEAD_ZONE) {
+                            gameboy.handle_key_code(true, JoypadButton::LEFT_BTN);
+                            gameboy.handle_key_code(false, JoypadButton::RIGHT_BTN);
+                        } else if (e.jaxis.value > JOYSTICK_DEAD_ZONE) {
+                            gameboy.handle_key_code(true, JoypadButton::RIGHT_BTN);
+                            gameboy.handle_key_code(false, JoypadButton::LEFT_BTN);
+                        } else {
+                            gameboy.handle_key_code(false, JoypadButton::LEFT_BTN);
+                            gameboy.handle_key_code(false, JoypadButton::RIGHT_BTN);
+                        }
+                    } else {
+                        if (e.jaxis.value < -JOYSTICK_DEAD_ZONE) {
+                            gameboy.handle_key_code(true, JoypadButton::UP_BTN);
+                            gameboy.handle_key_code(false, JoypadButton::DOWN_BTN);
+                        } else if (e.jaxis.value > JOYSTICK_DEAD_ZONE) {
+                            gameboy.handle_key_code(true, JoypadButton::DOWN_BTN);
+                            gameboy.handle_key_code(false, JoypadButton::UP_BTN);
+                        } else {
+                            gameboy.handle_key_code(false, JoypadButton::UP_BTN);
+                            gameboy.handle_key_code(false, JoypadButton::DOWN_BTN);
+                        }
+                    }
+                    break;
+                default:
+                    break;
             }
-            break;
         }
 
         SDL_RenderClear(screen.renderer);
@@ -135,14 +192,22 @@ int main(int argc, char** argv) {
         fprintf(stderr, "Usage: gbemu [romPath.gb]");
         return 1;
     }
-    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
+    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK);
 
-    // AUDIO Test
+    if (SDL_NumJoysticks() > 0) {
+        gameController = SDL_JoystickOpen(0);
+        if (gameController == nullptr) {
+            fprintf(stderr, "Could not open game controller\n");
+        }
+    } else {
+        gameController = nullptr;
+    }
+
     SDL_AudioSpec spec;
-    spec.freq = SAMPLE_RATE;  // Sample rate
+    spec.freq = Constants::SAMPLE_RATE;
     spec.format = AUDIO_S16SYS;
     spec.channels = 2;
-    spec.samples = SAMPLE_SIZE;  // Buffer size -> TODO verify that this is fine
+    spec.samples = SAMPLE_SIZE;
     spec.callback = nullptr;
 
     if (SDL_OpenAudio(&spec, 0) != 0) {
@@ -170,6 +235,9 @@ int main(int argc, char** argv) {
 
     destroy_screen(screen);
     SDL_CloseAudio();
+
+    SDL_JoystickClose(gameController);
+    gameController = nullptr;
 
     SDL_Quit();
     return 0;

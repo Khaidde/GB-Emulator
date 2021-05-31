@@ -43,6 +43,12 @@ void GameBoy::emulate_frame(u32* screenBuffer, s16* sampleBuffer, u16 sampleLen)
         totalTCycles += 4;
     }
     ppu.render(screenBuffer);
-    apu.sample(sampleBuffer, sampleLen);
+    if (debugger->is_paused()) {
+        for (int i = 0; i < sampleLen; i++) {
+            sampleBuffer[i] = 0;
+        }
+    } else {
+        apu.sample(sampleBuffer, sampleLen);
+    }
     totalTCycles -= PPU::TOTAL_CLOCKS;
 }

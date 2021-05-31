@@ -42,7 +42,11 @@ namespace Constants {
 constexpr const char* TITLE = "GameBoy Emulator";
 constexpr int WIDTH = 160;
 constexpr int HEIGHT = 144;
+
 constexpr double MS_PER_FRAME = 16.7427;
+
+constexpr double MASTER_VOLUME = 3;
+constexpr int SAMPLE_RATE = 48000;
 
 }  // namespace Constants
 

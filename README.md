@@ -31,7 +31,7 @@ A Gameboy/Gameboy Color emulator aimed at accuracy. This project is meant to be 
 
 | Test           | Passed | Note |
 | -------------- | :----: | ---- |
-| mem_oam        |        |      |
+| mem_oam        |   x    |      |
 | reg_f          |   x    |      |
 | unused_hwio-GS |   x    |      |
 
