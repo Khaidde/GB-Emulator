@@ -19,7 +19,17 @@ void GameBoy::load(const char* romPath) {
     memory.load_cartridge(romPath);
 }
 
-void GameBoy::emulate_frame(u32* screenBuffer, s16* sampleBuffer, u16 sampleLen) {
+void GameBoy::print_cartridge_info() { memory.print_cartridge_info(); }
+
+void GameBoy::set_debugger(Debugger& debugger) {
+    this->debugger = &debugger;
+    debugger.init(&cpu, &memory);
+
+    cpu.set_debugger(debugger);
+    memory.set_debugger(debugger);
+}
+
+void GameBoy::emulate_frame() {
     while (totalTCycles < PPU::TOTAL_CLOCKS) {
         if (cpu.isFetching() && debugger->is_paused() && !debugger->can_step()) {
             break;
@@ -42,7 +52,14 @@ void GameBoy::emulate_frame(u32* screenBuffer, s16* sampleBuffer, u16 sampleLen)
         memory.emulate_cycle();
         totalTCycles += 4;
     }
-    ppu.render(screenBuffer);
+    totalTCycles -= PPU::TOTAL_CLOCKS;
+}
+
+void GameBoy::emulate_frame(u32* screenBuffer, s16* sampleBuffer, u16 sampleLen) {
+    emulate_frame();
+    if (screenBuffer != nullptr) {
+        ppu.render(screenBuffer);
+    }
     if (debugger->is_paused()) {
         for (int i = 0; i < sampleLen; i++) {
             sampleBuffer[i] = 0;
@@ -50,5 +67,6 @@ void GameBoy::emulate_frame(u32* screenBuffer, s16* sampleBuffer, u16 sampleLen)
     } else {
         apu.sample(sampleBuffer, sampleLen);
     }
-    totalTCycles -= PPU::TOTAL_CLOCKS;
 }
+
+char GameBoy::get_serial_out() { return memory.read(IOReg::SB_REG); }

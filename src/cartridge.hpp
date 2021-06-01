@@ -4,6 +4,7 @@
 
 class Cartridge {
    public:
+    Cartridge(const char* cartName, u8* rom);
     virtual ~Cartridge() = default;
     virtual u8 read(u16 addr) = 0;
     virtual void write(u16 addr, u8 val) = 0;
@@ -12,11 +13,25 @@ class Cartridge {
     void setHasBattery(bool cartHasBattery) { this->hasBattery = cartHasBattery; }
     void setHasTimer(bool cartHasTimer) { this->hasTimer = cartHasTimer; }
 
+    u8 read_header(u16 addr);
+    void print_cartridge_info();
+
    protected:
+    const char* cartName;
+
+    static constexpr u16 HEADER_START = 0x104;
+    static constexpr u16 HEADER_SIZE = 0x150 - HEADER_START;
+    u8 header[HEADER_SIZE];
+
     bool hasRam = false;
     bool hasBattery = false;
     bool hasTimer = false;   // TODO unimplemented
     bool hasRumble = false;  // TODO unimplemented
+
+    u8 romType;
+    u8 ramType;
+    u16 numRomBanks;
+    u16 numRamBanks;
 };
 
 class ROMOnly : public Cartridge {
@@ -32,7 +47,7 @@ class ROMOnly : public Cartridge {
 
 class MBC1 : public Cartridge {
    public:
-    MBC1(u8* rom, u8 numRomBanks, u8 numRamBanks);
+    MBC1(u8* rom);
     ~MBC1() override;
     u8 read(u16 addr) override;
     void write(u16 addr, u8 val) override;
@@ -42,7 +57,6 @@ class MBC1 : public Cartridge {
     static constexpr u16 ROM_BANK_SIZE = 0x4000;
     using RomBank = u8[ROM_BANK_SIZE];
     static constexpr u8 MAX_ROM_BANKS = 128;
-    u8 numRomBanks;
     RomBank* romBanks;
 
     RomBank* zeroBank;
@@ -56,7 +70,6 @@ class MBC1 : public Cartridge {
     static constexpr u16 RAM_BANK_SIZE = 0x2000;
     using RamBank = u8[RAM_BANK_SIZE];
     static constexpr u8 MAX_RAM_BANKS = 4;
-    u8 numRamBanks;
     RamBank* ramBanks;
 
     RamBank* activeRamBank;

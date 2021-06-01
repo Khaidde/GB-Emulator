@@ -37,6 +37,7 @@ class Memory {
     void set_apu(APU& apu) { this->apu = &apu; }
 
     void load_cartridge(const char* romPath);
+    void print_cartridge_info();
 
     void request_interrupt(Interrupt interrupt);
 
