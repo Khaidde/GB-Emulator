@@ -2,6 +2,13 @@
 
 #include "game_boy.hpp"
 
+void SpriteList::clear() {
+    size = 0;
+    removedBitField = 0;
+}
+void SpriteList::add(Sprite&& sprite) { data[size++] = sprite; }
+void SpriteList::remove(u8 index) { removedBitField |= 1 << index; }
+
 PPU::PPU(Memory* memory) : memory(memory) {
     lcdc = &memory->ref(IOReg::LCDC_REG);
     stat = &memory->ref(IOReg::STAT_REG);
@@ -17,15 +24,6 @@ PPU::PPU(Memory* memory) : memory(memory) {
 }
 
 void PPU::restart() {
-    *lcdc = 0x91;
-    *stat = 0x85;  // ppu mode should be 1 (v_blank)
-    *scy = 0x00;
-    *scx = 0x00;
-    *lyc = 0x00;
-    memory->ref(IOReg::BGP_REG) = 0xFC;
-    *wy = 0x00;
-    *wx = 0x00;
-
     bufferSel = false;
     for (int i = 0; i < Constants::WIDTH * Constants::HEIGHT; i++) {
         (frameBuffers[0])[i] = BLANK_COLOR;
@@ -34,7 +32,7 @@ void PPU::restart() {
 
     drawClocks = 400;  // initial drawn clocks at PC=0x100
     mode = V_BLANK;
-    *ly = 0x99;
+    line = 0x99;
 
     statTrigger = false;
     statIntrFlags = 0;
@@ -59,6 +57,7 @@ void PPU::emulate_clock() {
         mode = Mode::OAM_SEARCH;
         *stat = (*stat & 0xFC) | 0;
         *ly = 0;
+        line = 0;
         statIntrFlags = 0;
         return;
     }
@@ -111,7 +110,7 @@ void PPU::emulate_clock() {
                     u8 y = *spritePtr;
                     u8 x = *(spritePtr + 1);
 
-                    u8 botBound = *ly + 16;
+                    u8 botBound = line + 16;
                     u8 spriteHeight = get_lcdc_flag(LCDCFlag::SPRITE_SIZE) ? 16 : 8;
                     if (x > 0) {
                         if (botBound - spriteHeight < y && y <= botBound) {
@@ -153,9 +152,9 @@ void PPU::emulate_clock() {
             fetcher.doFetch = !fetcher.doFetch;
 
             if (curPixelX == Constants::WIDTH) {
-                if (*ly == 135) {
-                    // printf("ccc-%d\n", drawClocks);
-                }
+                // if (line == 135) {
+                // printf("ccc-%d\n", drawClocks);
+                // }
                 // if (!fetcher.windowMode) {
                 // printf("----------------------ly=%d,c=%d,scx=%d,wx=%d,sprites=%d\n", *ly, drawClocks, *scx, *wx,
                 //    spriteCount);
@@ -167,9 +166,10 @@ void PPU::emulate_clock() {
             if (drawClocks >= LCD_AND_H_BLANK_CLOCKS) {
                 drawClocks -= LCD_AND_H_BLANK_CLOCKS;
                 (*ly)++;
+                line++;
                 lylycTriggerClock = 4;
 
-                if (*ly >= Constants::HEIGHT) {
+                if (line >= Constants::HEIGHT) {
                     set_mode(V_BLANK);
                 } else {
                     set_mode(OAM_SEARCH);
@@ -177,22 +177,28 @@ void PPU::emulate_clock() {
             }
             break;
         case V_BLANK:
-            if (drawClocks == 1 && *ly == Constants::HEIGHT) {
+            if (drawClocks == 1 && line == Constants::HEIGHT) {
                 update_stat();
                 trigger_stat_intr();
             }
-            if (drawClocks == 12 && *ly == V_BLANK_END_LINE - 1) {
-                update_coincidence();
-                trigger_stat_intr();
+            if (line == V_BLANK_END_LINE - 1) {
+                if (drawClocks == 4) {
+                    *ly = 0;
+                }
+                if (drawClocks == 12) {
+                    update_coincidence();
+                    trigger_stat_intr();
+                }
             }
             if (drawClocks >= SCAN_LINE_CLOCKS) {
                 drawClocks -= SCAN_LINE_CLOCKS;
-                (*ly)++;
+                (*ly) += line < V_BLANK_END_LINE - 1;
+                line++;
                 lylycTriggerClock = 4;
 
-                if (*ly >= V_BLANK_END_LINE) {
+                if (line >= V_BLANK_END_LINE) {
                     bufferSel = !bufferSel;
-                    *ly = 0;
+                    line = 0;
                     set_mode(OAM_SEARCH);
                 }
             }
@@ -201,8 +207,7 @@ void PPU::emulate_clock() {
 }
 
 void PPU::update_coincidence() {
-    bool coincidence = read_ly() == *lyc;
-    if (*ly == 0 && *lyc == 0) coincidence = false;
+    bool coincidence = *ly == *lyc;
     *stat = (*stat & 0xFB) | (coincidence << 2);
 
     bool lyLycEn = *stat & (1 << 6);
@@ -228,11 +233,6 @@ void PPU::trigger_stat_intr() {
     } else {
         statTrigger = false;
     }
-}
-
-u8 PPU::read_ly() {
-    if (*ly == 0x99 && drawClocks > 4) return 0;
-    return *ly;
 }
 
 bool PPU::is_vram_blocked() { return (*stat & 0x3) == 0x3; }
@@ -269,7 +269,7 @@ void PPU::handle_pixel_push() {
     }
     if (!fetcher.curSprite) {
         // if (*ly == 135) printf("c-%d\n", curPixelX);
-        frameBuffers[bufferSel][*ly * Constants::WIDTH + curPixelX++] = get_color(pxlFifo.pop_head());
+        frameBuffers[bufferSel][line * Constants::WIDTH + curPixelX++] = get_color(pxlFifo.pop_head());
     }
 }
 
@@ -282,7 +282,7 @@ void PPU::background_fetch() {
                               : 0x9800;
 
             u16 xOff = fetcher.windowMode ? 0 : (*scx / TILE_PX_SIZE);
-            u16 yOff = fetcher.windowMode ? (*ly - *wy) : (*scy + *ly);
+            u16 yOff = fetcher.windowMode ? (line - *wy) : (*scy + line);
 
             u8 tileX = (xOff + fetcher.tileX) % TILESET_SIZE;
             u8 tileY = (yOff / TILE_PX_SIZE) % TILESET_SIZE;
@@ -296,7 +296,7 @@ void PPU::background_fetch() {
                 fetcher.tileRowAddrOff = VRAM_TILE_DATA_1 - VRAM_TILE_DATA_0 + tileIndex * TILE_MEM_LEN + tileByteOff;
             }
             fetcher.fetchState = Fetcher::READ_TILE_0;
-            if (*ly == 135) {
+            if (line == 135) {
                 if (fetcher.windowMode) {
                     // printf("wid=%d\n", drawClocks);
                 } else {
@@ -307,7 +307,7 @@ void PPU::background_fetch() {
         case Fetcher::READ_TILE_0:
             fetcher.data0 = vramAddrBlock[fetcher.tileRowAddrOff];
             fetcher.fetchState = Fetcher::READ_TILE_1;
-            if (*ly == 135) {
+            if (line == 135) {
                 if (fetcher.windowMode) {
                     // printf("w0=%d\n", drawClocks);
                 } else {
@@ -320,7 +320,7 @@ void PPU::background_fetch() {
             if (pxlFifo.size >= 8) {
                 fetcher.fetchState = Fetcher::PUSH;
             }
-            if (*ly == 135) {
+            if (line == 135) {
                 if (fetcher.windowMode) {
                     // printf("w1=%d\n", drawClocks);
                 } else {
@@ -346,7 +346,7 @@ void PPU::background_fetch() {
                 fetcher.tileX++;
                 fetcher.fetchState = Fetcher::READ_TILE_ID;
             }
-            if (*ly == 135) {
+            if (line == 135) {
                 if (fetcher.windowMode) {
                     // printf("w_=%d\n", drawClocks);
                 } else {
@@ -370,9 +370,9 @@ void PPU::sprite_fetch() {
             u8 tileByteOff;
             bool yFlip = fetcher.curSprite->flags & (1 << 6);
             if (yFlip) {
-                tileByteOff = (fetcher.curSprite->y - *ly - 0x1) * 2;
+                tileByteOff = (fetcher.curSprite->y - line - 0x1) * 2;
             } else {
-                tileByteOff = (0x10 - (fetcher.curSprite->y - *ly)) * 2;
+                tileByteOff = (0x10 - (fetcher.curSprite->y - line)) * 2;
             }
 
             fetcher.tileRowAddrOff = tileIndex * TILE_MEM_LEN + tileByteOff;

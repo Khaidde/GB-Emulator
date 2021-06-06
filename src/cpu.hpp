@@ -2,7 +2,7 @@
 
 #include "debugger.hpp"
 #include "memory.hpp"
-#include "utils.hpp"
+#include "general.hpp"
 
 class Memory;
 class Debugger;

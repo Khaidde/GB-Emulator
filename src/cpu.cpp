@@ -92,7 +92,8 @@ void CPU::emulate_cycle() {
         // printf("%02x\n", memory->read(IOReg::LY_REG));
         // debugger->pause_exec();
         // test = true;
-        if (PC == 0x47F0) {
+        // if (PC == 0xFF9C) {
+        if (PC == 0x15D) {
             // debugger->pause_exec();
             // test = true;
         }
@@ -110,17 +111,17 @@ void CPU::emulate_cycle() {
 void CPU::execute(u8 opcode) {
     switch (opcode) {
         case 0x00: break; // NOP
-        case 0x10:
+        case 0x10: // STOP
             // TODO implement stop functionality correctly
             // Other emulators seem to wait some amount of cycles before waking up (0x20000 on gambatte)
+            // This allows double speed mode on CGB to work
 
             PC++;  // Stop instruction will skip the immediate next byte
-            break; // STOP
-        case 0x76: { // HALT
-            bool interrupts = memory->read(IOReg::IF_REG) & memory->read(IOReg::IE_REG) & 0x1F;
-            halted = ime || !interrupts;
+            break; 
+        case 0x76:  // HALT
+            halted = ime || !(memory->read(IOReg::IF_REG) & memory->read(IOReg::IE_REG) & 0x1F);
             if (!halted) haltBug = true;
-        } break;
+            break;
         case 0xF3: ime = false; break;         // DI
         case 0xFB: imeScheduled = true; break; // EI
         // LD (reg16), A

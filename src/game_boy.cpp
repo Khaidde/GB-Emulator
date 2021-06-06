@@ -9,14 +9,14 @@ GameBoy::GameBoy() : input(&memory), timer(&memory), ppu(&memory), apu(&memory) 
 }
 
 void GameBoy::load(const char* romPath) {
+    memory.load_cartridge(romPath);
+
     cpu.restart();
     memory.restart();
     input.restart();
     timer.restart();
     ppu.restart();
     apu.restart();
-
-    memory.load_cartridge(romPath);
 }
 
 void GameBoy::print_cartridge_info() { memory.print_cartridge_info(); }
@@ -57,9 +57,7 @@ void GameBoy::emulate_frame() {
 
 void GameBoy::emulate_frame(u32* screenBuffer, s16* sampleBuffer, u16 sampleLen) {
     emulate_frame();
-    if (screenBuffer != nullptr) {
-        ppu.render(screenBuffer);
-    }
+    ppu.render(screenBuffer);
     if (debugger->is_paused()) {
         for (int i = 0; i < sampleLen; i++) {
             sampleBuffer[i] = 0;

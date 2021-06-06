@@ -1,6 +1,6 @@
 #pragma once
 
-#include "utils.hpp"
+#include "general.hpp"
 
 class Memory;
 
@@ -12,12 +12,9 @@ struct Sprite {
 };
 
 struct SpriteList {
-    void clear() {
-        size = 0;
-        removedBitField = 0;
-    }
-    void add(Sprite&& sprite) { data[size++] = sprite; }
-    void remove(u8 index) { removedBitField |= 1 << index; }
+    void clear();
+    void add(Sprite&& sprite);
+    void remove(u8 index);
 
     static constexpr u8 MAX_SPRITES = 10;
     Sprite data[MAX_SPRITES];
@@ -64,7 +61,6 @@ class PPU {
     void update_coincidence();
     void trigger_stat_intr();
 
-    u8 read_ly();
     bool is_vram_blocked();
     bool is_oam_blocked();
 
@@ -111,6 +107,7 @@ class PPU {
 
     u8 numDiscardedPixels;
     u8 curPixelX;
+    u8 line;
 
     enum class LCDCFlag : u8 {
         BG_WINDOW_ENABLE = 0,
@@ -137,10 +134,10 @@ class PPU {
     // ICE_CREAM_GB const u32 baseColors[4] = {0xFFFFF6D3, 0xFFF9A875, 0xFFEB6B6F, 0xFF7C3F58};
     // COLD_FIRE_GB const u32 baseColors[4] = {0xFFF6C6A8, 0xFFD17C7C, 0xFF5B768D, 0xFF46425E};
     // SEA_SALT_ICE_CREAM const u32 baseColors[4] = {0xFFFFF6D3, 0xFF8BE6FF, 0xFF608ECF, 0xFF3336E8};
-    // MIST_GB const u32 baseColors[4] = {0xFFC4F0C2, 0xFF5AB9A8, 0xFF1E606E, 0xFF2D1B00};
+    // MIST_GB
+    const u32 baseColors[4] = {0xFFC4F0C2, 0xFF5AB9A8, 0xFF1E606E, 0xFF2D1B00};
     // CANDYPOP const u32 baseColors[4] = {0xFFEEBFF5, 0xFF9E81D0, 0xFF854576, 0xFF301221};
-    // CAVE4
-    const u32 baseColors[4] = {0xFFE4CBBF, 0xFF938282, 0xFF4F4E80, 0xFF2C0016};
+    // CAVE4 const u32 baseColors[4] = {0xFFE4CBBF, 0xFF938282, 0xFF4F4E80, 0xFF2C0016};
     const u32 BLANK_COLOR = 0xFF101010;
 
     void handle_pixel_push();

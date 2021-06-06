@@ -1,10 +1,7 @@
 #include "input.hpp"
 #include "memory.hpp"
 
-void Input::restart() {
-    keyState = 0xFF;
-    memory->ref(IOReg::JOYP_REG) = 0xCF;
-}
+void Input::restart() { keyState = 0xFF; }
 
 void Input::handle_input(bool pressed, u8 key) {
     u8 keyBit = 1 << key;

@@ -3,7 +3,27 @@
 #include <fstream>
 #include <vector>
 
-Memory::Memory() {
+namespace {
+
+constexpr u8 DMG_BOOT_IO[] = {
+    0xCF, 0x00, 0x7E, 0xFF, 0xAB, 0x00, 0x00, 0xF8, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xE1,  // FF00
+    0x80, 0xBF, 0xF3, 0xFF, 0xBF, 0xFF, 0x3F, 0x00, 0xFF, 0xBF, 0x7F, 0xFF, 0x9F, 0xFF, 0xBF, 0xFF,  // FF10
+    0xFF, 0x00, 0x00, 0xBF, 0x77, 0xF3, 0xF1, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,  // FF20
+    0x92, 0xFF, 0x20, 0xEA, 0x86, 0x7D, 0x14, 0x7E, 0x96, 0x7F, 0x00, 0xB9, 0x2C, 0x7A, 0x86, 0x3A,  // FF30
+    0x91, 0x85, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFC, 0xFF, 0xFF, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF,  // FF40
+};
+
+}
+
+void Memory::restart() {
+    for (int i = 0xFF00; i < 0xFF50; i++) {
+        mem[i] = DMG_BOOT_IO[i - 0xFF00];
+    }
+    for (int i = 0xFF50; i < 0xFF80; i++) {
+        mem[i] = 0xFF;
+    }
+    mem[IOReg::IE_REG] = 0x00;
+
     dmaInProgress = false;
     scheduleDma = false;
     dmaCycleCnt = 0;
@@ -11,18 +31,15 @@ Memory::Memory() {
     reset_cycles();
 }
 
-void Memory::restart() {
-    mem[IOReg::SB_REG] = 0x00;
-    mem[IOReg::SC_REG] = 0x7E;
-
-    mem[IOReg::IF_REG] = 0xE1;
-    mem[IOReg::IE_REG] = 0x00;
-}
-
 void Memory::load_cartridge(const char* romPath) {
     std::ifstream file(romPath, std::ios::binary | std::ios::ate);
     if (!file.is_open()) {
         fatal("Can't read from file: %s\n", romPath);
+    }
+
+    isCGB = FileManagement::is_path_extension(romPath, ".gbc");
+    if (isCGB) {
+        fatal("TODO gameboy color games are not yet supported!\n");
     }
 
     size_t romSize = file.tellg();
@@ -63,7 +80,6 @@ u8 Memory::read(u16 addr) {
         return cartridge->read(addr);
     }
     if (ppu->is_vram_blocked() && 0x8000 <= addr && addr < 0xA000) {
-        // printf("Attempt to read vram during mode 3\n");
         return 0xFF;
     }
     if (0xFE00 <= addr && addr < 0xFF00) {
@@ -75,26 +91,12 @@ u8 Memory::read(u16 addr) {
         }
         return mem[addr];
     }
-    if (0xFF03 == addr) {
-        return 0xFF;
-    }
-    if (0xFF08 <= addr && addr <= 0xFF0E) {
-        return 0xFF;
-    }
     if (0xFF10 <= addr && addr <= 0xFF26) {
         return apu->read_register(mem[addr], addr & 0xFF);
-    }
-    if (0xFF27 <= addr && addr <= 0xFF30) {
-        return 0xFF;
-    }
-    if (0xFF4C <= addr && addr <= 0xFF7F) {
-        return 0xFF;
     }
     switch (addr) {
         case IOReg::JOYP_REG:
             return input->get_key_state(mem[addr]);
-        case IOReg::LY_REG:
-            return ppu->read_ly();
         default:
             return mem[addr];
     }
@@ -106,7 +108,6 @@ void Memory::write(u16 addr, u8 val) {
         return;
     }
     if (ppu->is_vram_blocked() && 0x8000 <= addr && addr < 0xA000) {
-        // printf("Attempt to write to vram during mode 3\n");
         return;
     }
     if (0xC000 <= addr && addr < 0xDE00) {
@@ -126,9 +127,21 @@ void Memory::write(u16 addr, u8 val) {
             return;
         }
     }
+    if (0xFF03 == addr) {
+        return;
+    }
+    if (0xFF08 <= addr && addr <= 0xFF0E) {
+        return;
+    }
     if (0xFF10 <= addr && addr <= 0xFF26) {
         apu->write_register(addr & 0xFF, val);
         mem[addr] = val;
+        return;
+    }
+    if (0xFF27 <= addr && addr <= 0xFF30) {
+        return;
+    }
+    if (0xFF4C <= addr && addr <= 0xFF7F) {
         return;
     }
     switch (addr) {
@@ -166,7 +179,7 @@ void Memory::write(u16 addr, u8 val) {
             break;
         case IOReg::DMA_REG:
             if (0xFE <= val && val <= 0xFF) {
-                printf("TODO illegal DMA source value\n");
+                fatal("TODO illegal DMA source value: %d\n", val);
                 val = mem[addr];
             }
             scheduleDma = true;

@@ -21,6 +21,7 @@ set(SOURCES
     src/cpu.cpp
     src/debugger.cpp
     src/game_boy.cpp
+    src/general.cpp
     src/input.cpp
     src/main.cpp
     src/memory.cpp

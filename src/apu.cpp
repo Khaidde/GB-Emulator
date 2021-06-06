@@ -295,19 +295,24 @@ u8 NoiseChannel::get_right_vol() { return outVol * rightEnable; }
 APU::APU(Memory* memory) : memory(memory) { wave.set_samples(&memory->ref(IOReg::WAVE_TABLE_START_REG)); }
 
 void APU::restart() {
-    memory->write(IOReg::NR10_REG, 0x80);
-    memory->write(IOReg::NR11_REG, 0xBF);
-    memory->write(IOReg::NR12_REG, 0xF3);
-    memory->write(IOReg::NR13_REG, 0xC1);
+    memory->ref(IOReg::NR10_REG) = 0x80;
+    memory->ref(IOReg::NR11_REG) = 0xBF;
+    memory->ref(IOReg::NR12_REG) = 0xF3;
+    memory->ref(IOReg::NR13_REG) = 0xC1;
+    memory->ref(IOReg::NR14_REG) = 0xBF;
 
-    memory->write(IOReg::NR32_REG, 0x9F);
-    memory->write(IOReg::NR34_REG, 0xBF);
+    // TODO figure out how to exhaust length counter in square2
+    memory->ref(IOReg::NR21_REG) = 0x3F;
 
-    memory->write(IOReg::NR43_REG, 0x00);
+    memory->ref(IOReg::NR30_REG) = 0x7F;
+    memory->ref(IOReg::NR32_REG) = 0x9F;
+    memory->ref(IOReg::NR34_REG) = 0xBF;
 
-    memory->write(IOReg::NR50_REG, 0x77);
-    memory->write(IOReg::NR51_REG, 0xF3);
-    memory->write(IOReg::NR52_REG, 0xF1);
+    memory->ref(IOReg::NR43_REG) = 0x00;
+
+    memory->ref(IOReg::NR50_REG) = 0x77;
+    memory->ref(IOReg::NR51_REG) = 0xF3;
+    memory->ref(IOReg::NR52_REG) = 0xF1;
 
     frameSequenceClocks = 0;
     downSampleCnt = 0;

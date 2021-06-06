@@ -2,7 +2,7 @@
 
 #include "cpu.hpp"
 #include "memory.hpp"
-#include "utils.hpp"
+#include "general.hpp"
 
 class CPU;
 class Memory;

@@ -8,10 +8,6 @@ Timer::Timer(Memory* memory) : memory(memory) {
 }
 
 void Timer::restart() {
-    *tima = 0x00;
-    memory->ref(IOReg::TMA_REG) = 0x00;
-    memory->ref(IOReg::TAC_REG) = 0xF8;
-
     clocks = 0xABCC;
     timaScheduled = false;
 

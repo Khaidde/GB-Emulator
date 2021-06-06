@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <stdexcept>
+#include <cstring>
 
 using u8 = uint8_t;
 using u16 = uint16_t;
@@ -14,6 +15,12 @@ using s16 = int16_t;
     char buff[0xFF] = "FATAL ERROR: ";                                                 \
     snprintf(buff + 13 * sizeof(char), sizeof(buff) - 13 * sizeof(char), __VA_ARGS__); \
     throw std::runtime_error(buff)
+
+namespace FileManagement {
+
+bool is_path_extension(const char* romPath, const char* extension);
+
+}  // namespace FileManagement
 
 template <typename T, int capacity>
 struct Queue {
