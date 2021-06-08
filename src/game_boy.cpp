@@ -27,6 +27,7 @@ void GameBoy::set_debugger(Debugger& debugger) {
 
     cpu.set_debugger(debugger);
     memory.set_debugger(debugger);
+    ppu.set_debugger(debugger);
 }
 
 void GameBoy::emulate_frame() {

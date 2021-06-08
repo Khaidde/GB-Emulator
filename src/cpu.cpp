@@ -25,7 +25,7 @@ void CPU::handle_interrupts() {
     u8 interrupts = ifReg & memory->read(IOReg::IE_REG) & 0x1F;
     if (interrupts) {
         // TODO only add extra cycle if emulating CGB
-        // if (halted) cycleAcc++;  // Extra cycle if cpu is in halt mode
+        // if (halted) cycleCnt++;  // Extra cycle if cpu is in halt mode
 
         if (ime) {
             for (int i = 0; i < 5; i++) {
@@ -75,28 +75,8 @@ void CPU::emulate_cycle() {
         execute(op);
     }
 
-    cycleCnt--;
-    if (cycleCnt == 0) {
-        // if (PC == 0x210 && AF.hi == 0x98 && cnt == 8) {
-        // if (memory->read(IOReg::LY_REG) == 0x8F && cnt == 8) {
-        // if (PC == 0x212 && AF.hi == 0x40) {
-        // if (PC == 0x21C && AF.hi == 0) {
-        // if (PC == 0x22d) {
-        // if (PC == 0x1D2 && memory->read(IOReg::LY_REG) == 0x00) {
-        // if (PC == 0x196) {
-        // if (PC == 0xff9C) {
-        // if (PC >= 0x190 && memory->read(IOReg::LY_REG) == 0x98) {
-        // if (PC == 0x1A7 && memory->read(IOReg::LY_REG) == 0x01) {
-        // if (PC == 0x48) {
-        // if (PC == 0x164) {
-        // printf("%02x\n", memory->read(IOReg::LY_REG));
-        // debugger->pause_exec();
-        // test = true;
-        // if (PC == 0xFF9C) {
-        if (PC == 0x15D) {
-            // debugger->pause_exec();
-            // test = true;
-        }
+    if (--cycleCnt == 0) {
+        PAUSE_EXEC_OCC(this, debugger, 0x48, 1);
     }
 
     if (callbackCycle > 0) {

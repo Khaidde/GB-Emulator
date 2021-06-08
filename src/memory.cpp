@@ -94,12 +94,10 @@ u8 Memory::read(u16 addr) {
     if (0xFF10 <= addr && addr <= 0xFF26) {
         return apu->read_register(mem[addr], addr & 0xFF);
     }
-    switch (addr) {
-        case IOReg::JOYP_REG:
-            return input->get_key_state(mem[addr]);
-        default:
-            return mem[addr];
+    if (addr == IOReg::JOYP_REG) {
+        return input->get_key_state(mem[addr]);
     }
+    return mem[addr];
 }
 
 void Memory::write(u16 addr, u8 val) {
@@ -141,6 +139,10 @@ void Memory::write(u16 addr, u8 val) {
     if (0xFF27 <= addr && addr <= 0xFF30) {
         return;
     }
+    if (addr == IOReg::LCDC_REG || addr == IOReg::STAT_REG || addr == IOReg::LYC_REG) {
+        ppu->write_register(addr, val);
+        return;
+    }
     if (0xFF4C <= addr && addr <= 0xFF7F) {
         return;
     }
@@ -162,20 +164,6 @@ void Memory::write(u16 addr, u8 val) {
             timer->set_enable((val >> 2) & 0x1);
             timer->set_frequency(val & 0x3);
             mem[addr] = 0xF8 | (val & 0x7);
-            break;
-        case IOReg::LCDC_REG:
-            if ((val & (1 << 7)) == 0) mem[IOReg::LY_REG] = 0;
-            mem[addr] = val;
-            break;
-        case IOReg::STAT_REG:
-            mem[addr] = 0x80 | (val & 0x78) | (mem[addr] & 0x7);
-            ppu->update_stat();
-            ppu->trigger_stat_intr();
-            break;
-        case IOReg::LYC_REG:
-            mem[addr] = val;
-            ppu->update_coincidence();
-            ppu->trigger_stat_intr();
             break;
         case IOReg::DMA_REG:
             if (0xFE <= val && val <= 0xFF) {

@@ -6,8 +6,18 @@ void SpriteList::clear() {
     size = 0;
     removedBitField = 0;
 }
+
 void SpriteList::add(Sprite&& sprite) { data[size++] = sprite; }
+
 void SpriteList::remove(u8 index) { removedBitField |= 1 << index; }
+
+void Fetcher::reset() {
+    doFetch = false;
+    fetchState = Fetcher::READ_TILE_ID;
+    curSprite = nullptr;
+    windowMode = false;
+    tileX = 0;
+}
 
 PPU::PPU(Memory* memory) : memory(memory) {
     lcdc = &memory->ref(IOReg::LCDC_REG);
@@ -24,21 +34,19 @@ PPU::PPU(Memory* memory) : memory(memory) {
 }
 
 void PPU::restart() {
-    bufferSel = false;
+    bufferSel = 0;
     for (int i = 0; i < Constants::WIDTH * Constants::HEIGHT; i++) {
         (frameBuffers[0])[i] = BLANK_COLOR;
         (frameBuffers[1])[i] = BLANK_COLOR;
     }
 
     drawClocks = 400;  // initial drawn clocks at PC=0x100
-    mode = V_BLANK;
+    curPPUState = PPUState::V_BLANK;
     line = 0x99;
 
-    statTrigger = false;
     statIntrFlags = 0;
-    modeSwitchClocks = 0;
-
-    lylycTriggerClock = 0;
+    internalStatEnable = 0;
+    lcdLineCycles = 0;
 }
 
 void PPU::render(u32* pixelBuffer) {
@@ -53,15 +61,10 @@ int cnt = 0;
 static int spriteCount = 0;
 void PPU::emulate_clock() {
     if (!get_lcdc_flag(LCDCFlag::LCD_ENABLE)) {
-        drawClocks = 0;
-        mode = Mode::OAM_SEARCH;
-        *stat = (*stat & 0xFC) | 0;
-        *ly = 0;
-        line = 0;
-        statIntrFlags = 0;
         return;
     }
     drawClocks++;
+    /*
     if (mode == Mode::OAM_SEARCH) {
         cnt = (OAM_SEARCH_CLOCKS - drawClocks) / 2;
     }
@@ -74,36 +77,38 @@ void PPU::emulate_clock() {
     if (mode == Mode::V_BLANK) {
         cnt = (SCAN_LINE_CLOCKS - drawClocks) / 2;
     }
+    */
     if (test) {
-        printf("\t\t\t%d-%d-%d\n", cnt, drawClocks, statTrigger);
+        printf("\t\t\t%d-%d-%02x\n", cnt, drawClocks, statIntrFlags);
     }
-    if (modeSwitchClocks > 0) {
-        modeSwitchClocks--;
-        if (modeSwitchClocks == 0) {
-            if (mode == V_BLANK) {
-                memory->request_interrupt(Interrupt::VBLANK_INT);
-                // printf("vblank!-%d,%d\n", *ly, drawClocks);
+    switch (curPPUState) {
+        case PPUState::OAM_0:
+            if (drawClocks == 3) {
+                if (line == 0) {
+                    // When switching from v_blank to oam_search, momentarily switch to h_blank
+                    // Timing is unverified
+                    set_stat_mode(H_BLANK_MODE);
+                } else {
+                    // OAM interrupt occurs 1 T-cycle before stat mode change when line > 0
+                    update_mode_intr(OAM_MODE);
+                    clear_stat_mode_intr(H_BLANK_MODE);
+                }
+                curPPUState = PPUState::OAM_3;
             }
-            *stat = (*stat & 0xFC) | mode;
-            statIntrFlags &= 0x8;
-            if (mode < 3 && (*stat & (1 << (mode + 3)))) {
-                statIntrFlags |= 1 << mode;
-                trigger_stat_intr();
+            break;
+        case PPUState::OAM_3:
+            set_stat_mode(OAM_MODE);
+            if (line == 0) {
+                update_mode_intr(OAM_MODE);
+                clear_stat_mode_intr(V_BLANK_MODE);
+            } else {
+                try_lyc_intr();
             }
-        }
-    }
-    if (lylycTriggerClock > 0) {
-        lylycTriggerClock--;
-        if (lylycTriggerClock == 0) {
-            update_coincidence();
-            trigger_stat_intr();
-        }
-    }
-    switch (mode) {
-        case Mode::OAM_SEARCH:
-            if (drawClocks >= OAM_SEARCH_CLOCKS) {
-                drawClocks -= OAM_SEARCH_CLOCKS;
-
+            curPPUState = PPUState::OAM_4;
+            break;
+        case PPUState::OAM_4:
+            if (drawClocks == OAM_SEARCH_CLOCKS) {
+                drawClocks = 0;
                 spriteList.clear();
                 for (int i = 0; i < 40; i++) {
                     u8* spritePtr = &oamAddrBlock[i << 2];
@@ -123,25 +128,28 @@ void PPU::emulate_clock() {
                 }
                 spriteCount = spriteList.size;
 
-                fetcher.doFetch = false;
-                fetcher.fetchState = Fetcher::READ_TILE_ID;
-                fetcher.curSprite = nullptr;
-                fetcher.windowMode = false;
-                fetcher.tileX = 0;
+                fetcher.reset();
+
+                lockedSCX = *scx;
 
                 numDiscardedPixels = 0;
                 curPixelX = 0;
 
                 pxlFifo.clear();
 
-                set_mode(LCD_TRANSFER);
+                curPPUState = PPUState::LCD_0;
             }
             break;
-        case LCD_TRANSFER: {
+        case PPUState::LCD_0:
+            if (drawClocks == 4) {
+                set_stat_mode(LCD_MODE);
+                clear_stat_mode_intr(OAM_MODE);
+                curPPUState = PPUState::LCD_4;
+            }
+        case PPUState::LCD_4:
             if (pxlFifo.size > 8 && !fetcher.curSprite) {
                 handle_pixel_push();
             }
-
             if (fetcher.doFetch) {
                 if (fetcher.curSprite) {
                     sprite_fetch();
@@ -152,94 +160,159 @@ void PPU::emulate_clock() {
             fetcher.doFetch = !fetcher.doFetch;
 
             if (curPixelX == Constants::WIDTH) {
-                // if (line == 135) {
-                // printf("ccc-%d\n", drawClocks);
-                // }
-                // if (!fetcher.windowMode) {
-                // printf("----------------------ly=%d,c=%d,scx=%d,wx=%d,sprites=%d\n", *ly, drawClocks, *scx, *wx,
-                //    spriteCount);
-                // }
-                set_mode(H_BLANK);
+                lcdLineCycles = drawClocks;
+                curPPUState = PPUState::H_BLANK_0;
             }
-        } break;
-        case H_BLANK:
-            if (drawClocks >= LCD_AND_H_BLANK_CLOCKS) {
-                drawClocks -= LCD_AND_H_BLANK_CLOCKS;
+            break;
+        case PPUState::H_BLANK_0:
+            if (drawClocks - lcdLineCycles == 4) {
+                set_stat_mode(H_BLANK_MODE);
+                update_mode_intr(H_BLANK_MODE);
+                curPPUState = PPUState::H_BLANK_4;
+            }
+            break;
+        case PPUState::H_BLANK_4:
+            if (drawClocks == LCD_AND_H_BLANK_CLOCKS) {
+                drawClocks = 0;
                 (*ly)++;
                 line++;
-                lylycTriggerClock = 4;
-
                 if (line >= Constants::HEIGHT) {
-                    set_mode(V_BLANK);
-                } else {
-                    set_mode(OAM_SEARCH);
-                }
-            }
-            break;
-        case V_BLANK:
-            if (drawClocks == 1 && line == Constants::HEIGHT) {
-                update_stat();
-                trigger_stat_intr();
-            }
-            if (line == V_BLANK_END_LINE - 1) {
-                if (drawClocks == 4) {
-                    *ly = 0;
-                }
-                if (drawClocks == 12) {
-                    update_coincidence();
-                    trigger_stat_intr();
-                }
-            }
-            if (drawClocks >= SCAN_LINE_CLOCKS) {
-                drawClocks -= SCAN_LINE_CLOCKS;
-                (*ly) += line < V_BLANK_END_LINE - 1;
-                line++;
-                lylycTriggerClock = 4;
-
-                if (line >= V_BLANK_END_LINE) {
+                    curPPUState = PPUState::V_BLANK_144_0;
                     bufferSel = !bufferSel;
+                } else {
+                    curPPUState = PPUState::OAM_0;
+                }
+            }
+            break;
+        case PPUState::V_BLANK_144_0:
+            if (drawClocks == 4) {
+                memory->request_interrupt(Interrupt::VBLANK_INT);
+                update_mode_intr(V_BLANK_MODE);
+
+                // OAM interrupt can occur on line 144
+                update_mode_intr(OAM_MODE);
+                clear_stat_mode_intr(OAM_MODE);
+
+                clear_stat_mode_intr(H_BLANK_MODE);
+
+                try_lyc_intr();
+                curPPUState = PPUState::V_BLANK;
+            }
+            break;
+        case PPUState::V_BLANK_145_152_0:
+            if (drawClocks == 4) {
+                try_lyc_intr();
+                curPPUState = PPUState::V_BLANK;
+            }
+            break;
+        case PPUState::V_BLANK_153_0:
+            if (drawClocks == 4) {
+                *ly = 0;
+                try_lyc_intr();
+                curPPUState = PPUState::V_BLANK_153_4;
+            }
+            break;
+        case PPUState::V_BLANK_153_4:
+            if (drawClocks == 12) {
+                try_lyc_intr();
+                curPPUState = PPUState::V_BLANK;
+            }
+            break;
+        case PPUState::V_BLANK:
+            if (drawClocks == SCAN_LINE_CLOCKS) {
+                drawClocks = 0;
+                line++;
+                if (line < V_BLANK_END_LINE - 1) {
+                    (*ly)++;
+                    curPPUState = PPUState::V_BLANK_145_152_0;
+                } else if (line == V_BLANK_END_LINE - 1) {
+                    curPPUState = PPUState::V_BLANK_153_0;
+                } else {
                     line = 0;
-                    set_mode(OAM_SEARCH);
+                    curPPUState = PPUState::OAM_0;
                 }
             }
             break;
     }
 }
 
-void PPU::update_coincidence() {
-    bool coincidence = *ly == *lyc;
-    *stat = (*stat & 0xFB) | (coincidence << 2);
-
-    bool lyLycEn = *stat & (1 << 6);
-    statIntrFlags = ((lyLycEn && coincidence) << 3) | (statIntrFlags & 0x7);
-}
-
-void PPU::update_stat() {
-    statIntrFlags &= 0x8;
-    for (int i = 3; i <= 5; i++) {
-        if (*stat & (1 << i) && (*stat & 0x3) == i - 3) {
-            statIntrFlags |= 1 << (i - 3);
-        }
+void PPU::write_register(u16 addr, u8 val) {
+    switch (addr) {
+        case IOReg::LCDC_REG: {
+            bool lcdOn = (val & (1 << 7));
+            if (lcdOn && !get_lcdc_flag(LCDCFlag::LCD_ENABLE)) {
+                drawClocks = 4;  // Hack to enable correct lcd on timing
+                try_lyc_intr();
+            } else if (!lcdOn && get_lcdc_flag(LCDCFlag::LCD_ENABLE)) {
+                curPPUState = PPUState::OAM_0;
+                *stat = (*stat & 0xFC) | 0;
+                *ly = 0;
+                line = 0;
+                statIntrFlags = 0;
+                try_lyc_intr();
+            }
+            *lcdc = val;
+        } break;
+        case IOReg::STAT_REG: {
+            u8 changedEnable = ((*stat ^ val) >> 3) & internalStatEnable;
+            *stat = 0x80 | (val & 0x78) | (*stat & 0x7);
+            for (int i = 0; i <= 2; i++) {
+                if (changedEnable & (1 << i)) {
+                    printf("%d-%d-%02x\n", i, (int)curPPUState, line);
+                    try_mode_intr(i);
+                }
+            }
+            try_lyc_intr();
+        } break;
+        case IOReg::LYC_REG:
+            *lyc = val;
+            try_lyc_intr();
+            break;
     }
-    update_coincidence();
 }
 
-void PPU::trigger_stat_intr() {
-    if (statIntrFlags) {
-        if (!statTrigger) {
-            statTrigger = true;
+void PPU::set_stat_mode(PPUMode statMode) { *stat = (*stat & ~0x3) | statMode; }
+
+void PPU::try_lyc_intr() {
+    u8 prevIntrFlags = statIntrFlags;
+
+    bool coincidence = *ly == *lyc;
+    bool lyLycEn = *stat & (1 << 6);
+    statIntrFlags &= 0x7;
+    statIntrFlags |= (lyLycEn && coincidence) << 3;
+
+    if (!prevIntrFlags && statIntrFlags) {
+        memory->request_interrupt(Interrupt::STAT_INT);
+    }
+}
+
+void PPU::try_mode_intr(u8 statMode) {
+    u8 prevIntrFlags = statIntrFlags;
+    if (*stat & (1 << (statMode + 3))) {
+        statIntrFlags |= 1 << statMode;
+        if (!prevIntrFlags) {
             memory->request_interrupt(Interrupt::STAT_INT);
         }
     } else {
-        statTrigger = false;
+        statIntrFlags &= ~(1 << statMode);
     }
+}
+
+void PPU::update_mode_intr(PPUMode statMode) {
+    try_mode_intr(statMode);
+    internalStatEnable |= 1 << statMode;
+}
+
+void PPU::clear_stat_mode_intr(PPUMode statMode) {
+    internalStatEnable &= ~(1 << statMode);
+    statIntrFlags &= ~(1 << statMode);
 }
 
 bool PPU::is_vram_blocked() { return (*stat & 0x3) == 0x3; }
 bool PPU::is_oam_blocked() { return *stat & 0x2; }
 
 void PPU::handle_pixel_push() {
-    if (!fetcher.windowMode && get_lcdc_flag(LCDCFlag::WINDOW_ENABLE) && *ly >= *wy && curPixelX >= *wx - 7) {
+    if (!fetcher.windowMode && get_lcdc_flag(LCDCFlag::WINDOW_ENABLE) && line >= *wy && curPixelX >= *wx - 7) {
         fetcher.doFetch = false;
         fetcher.fetchState = Fetcher::READ_TILE_ID;
 
@@ -248,7 +321,7 @@ void PPU::handle_pixel_push() {
         pxlFifo.clear();
         return;
     }
-    if (!fetcher.windowMode && numDiscardedPixels < *scx % TILE_PX_SIZE) {
+    if (!fetcher.windowMode && numDiscardedPixels < lockedSCX % TILE_PX_SIZE) {
         numDiscardedPixels++;
         pxlFifo.pop_head();
         return;
@@ -268,7 +341,6 @@ void PPU::handle_pixel_push() {
         }
     }
     if (!fetcher.curSprite) {
-        // if (*ly == 135) printf("c-%d\n", curPixelX);
         frameBuffers[bufferSel][line * Constants::WIDTH + curPixelX++] = get_color(pxlFifo.pop_head());
     }
 }
@@ -281,51 +353,29 @@ void PPU::background_fetch() {
                               ? 0x9C00
                               : 0x9800;
 
-            u16 xOff = fetcher.windowMode ? 0 : (*scx / TILE_PX_SIZE);
+            u16 xOff = fetcher.windowMode ? 0 : lockedSCX;
             u16 yOff = fetcher.windowMode ? (line - *wy) : (*scy + line);
 
-            u8 tileX = (xOff + fetcher.tileX) % TILESET_SIZE;
+            u8 tileX = (xOff / TILE_PX_SIZE + fetcher.tileX) % TILESET_SIZE;
             u8 tileY = (yOff / TILE_PX_SIZE) % TILESET_SIZE;
             s8 tileIndex = vramAddrBlock[(tileX + tileY * TILESET_SIZE) + tileMap - VRAM_START_ADDR];
             u8 tileByteOff = (yOff % TILE_PX_SIZE) * 2;
 
-            bool unsign = get_lcdc_flag(LCDCFlag::TILE_DATA_SELECT);
-            if (unsign) {
+            if (get_lcdc_flag(LCDCFlag::TILE_DATA_SELECT)) {
                 fetcher.tileRowAddrOff = (u8)tileIndex * TILE_MEM_LEN + tileByteOff;
             } else {
                 fetcher.tileRowAddrOff = VRAM_TILE_DATA_1 - VRAM_TILE_DATA_0 + tileIndex * TILE_MEM_LEN + tileByteOff;
             }
             fetcher.fetchState = Fetcher::READ_TILE_0;
-            if (line == 135) {
-                if (fetcher.windowMode) {
-                    // printf("wid=%d\n", drawClocks);
-                } else {
-                    // printf("bid=%d\n", drawClocks);
-                }
-            }
         } break;
         case Fetcher::READ_TILE_0:
             fetcher.data0 = vramAddrBlock[fetcher.tileRowAddrOff];
             fetcher.fetchState = Fetcher::READ_TILE_1;
-            if (line == 135) {
-                if (fetcher.windowMode) {
-                    // printf("w0=%d\n", drawClocks);
-                } else {
-                    // printf("b0=%d\n", drawClocks);
-                }
-            }
             break;
         case Fetcher::READ_TILE_1:
             fetcher.data1 = vramAddrBlock[fetcher.tileRowAddrOff + 1];
             if (pxlFifo.size >= 8) {
                 fetcher.fetchState = Fetcher::PUSH;
-            }
-            if (line == 135) {
-                if (fetcher.windowMode) {
-                    // printf("w1=%d\n", drawClocks);
-                } else {
-                    // printf("b1=%d\n", drawClocks);
-                }
             }
         case Fetcher::PUSH:
             if (pxlFifo.size <= 8) {
@@ -345,13 +395,6 @@ void PPU::background_fetch() {
                 }
                 fetcher.tileX++;
                 fetcher.fetchState = Fetcher::READ_TILE_ID;
-            }
-            if (line == 135) {
-                if (fetcher.windowMode) {
-                    // printf("w_=%d\n", drawClocks);
-                } else {
-                    // printf("b_=%d\n", drawClocks);
-                }
             }
             break;
         default:
@@ -384,7 +427,6 @@ void PPU::sprite_fetch() {
             break;
         case Fetcher::READ_TILE_1:
             fetcher.data1 = vramAddrBlock[fetcher.tileRowAddrOff + 1];
-
         case Fetcher::PUSH: {
             int xOff = fetcher.curSprite->x < 8 ? 8 - fetcher.curSprite->x : 0;
             bool bgPriority = fetcher.curSprite->flags & (1 << 7);
@@ -419,20 +461,6 @@ void PPU::sprite_fetch() {
 }
 
 bool PPU::get_lcdc_flag(LCDCFlag flag) { return *lcdc & (1 << (u8)flag); }
-
-void PPU::set_mode(Mode changeToMode) {
-    // When switching from h_blank to v_blank, momentarily switch to oam_search
-    if (changeToMode == OAM_SEARCH && this->mode == V_BLANK) {
-        *stat = (*stat & 0xFC) | 0x2;
-    }
-    // When switching from oam_search to v_blank, momentarily switch to h_blank
-    if (changeToMode == OAM_SEARCH && this->mode == V_BLANK) {
-        *stat = (*stat & 0xFC);
-    }
-    // TODO only delay stat mode change on DMG
-    this->modeSwitchClocks = 4;
-    this->mode = changeToMode;
-}
 
 u32 PPU::get_color(FIFOData&& data) {
     data.colIndex &= 0x03;

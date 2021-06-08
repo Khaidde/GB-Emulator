@@ -3,6 +3,7 @@
 #include "general.hpp"
 
 class Memory;
+class Debugger;
 
 struct Sprite {
     u8 y;
@@ -23,6 +24,8 @@ struct SpriteList {
 };
 
 struct Fetcher {
+    void reset();
+
     bool doFetch;
     enum {
         READ_TILE_ID,
@@ -31,14 +34,52 @@ struct Fetcher {
         PUSH,
     } fetchState;
     Sprite* curSprite;
-
     bool windowMode;
-
     u8 tileX;
 
     u16 tileRowAddrOff;
     u8 data0;
     u8 data1;
+};
+
+struct FIFOData {
+    u8 colIndex;
+    bool isSprite;
+    u16 palleteAddr;
+};
+
+enum class LCDCFlag : u8 {
+    BG_WINDOW_ENABLE = 0,
+    SPRITE_ENABLE = 1,
+    SPRITE_SIZE = 2,
+    BG_TILE_SELECT = 3,
+    TILE_DATA_SELECT = 4,
+    WINDOW_ENABLE = 5,
+    WINDOW_TILE_SELECT = 6,
+    LCD_ENABLE = 7,
+};
+
+enum PPUMode : u8 {
+    H_BLANK_MODE = 0,
+    V_BLANK_MODE = 1,
+    OAM_MODE = 2,
+    LCD_MODE = 3,
+};
+
+enum class PPUState {
+    OAM_0,
+    OAM_3,
+    OAM_4,
+    LCD_0,
+    LCD_4,
+    H_BLANK_0,
+    H_BLANK_4,
+
+    V_BLANK_144_0,
+    V_BLANK_145_152_0,
+    V_BLANK_153_0,
+    V_BLANK_153_4,
+    V_BLANK,
 };
 
 class PPU {
@@ -54,17 +95,32 @@ class PPU {
 
     PPU(Memory* memory);
     void restart();
+    void set_debugger(Debugger& debugger) { this->debugger = &debugger; }
     void render(u32* pixelBuffer);
     void emulate_clock();
 
-    void update_stat();
-    void update_coincidence();
-    void trigger_stat_intr();
+    void write_register(u16 addr, u8 val);
 
     bool is_vram_blocked();
     bool is_oam_blocked();
 
    private:
+    void set_stat_mode(PPUMode statMode);
+    void try_lyc_intr();
+    void try_mode_intr(u8 statMode);
+    void update_mode_intr(PPUMode statMode);
+    void clear_stat_mode_intr(PPUMode statMode);
+
+    void handle_pixel_push();
+
+    void background_fetch();
+    void sprite_fetch();
+
+    bool get_lcdc_flag(LCDCFlag flag);
+
+    u32 get_color(FIFOData&& data);
+
+    Debugger* debugger;
     Memory* memory;
 
     u8* lcdc;
@@ -87,6 +143,7 @@ class PPU {
     FrameBuffer frameBuffers[2];
 
     u16 drawClocks;
+    PPUState curPPUState;
 
     SpriteList spriteList;
 
@@ -97,39 +154,20 @@ class PPU {
     static constexpr u16 VRAM_TILE_DATA_1 = 0x9000;
     Fetcher fetcher;
 
-    struct FIFOData {
-        u8 colIndex;
-        bool isSprite;
-        u16 palleteAddr;
-    };
     static constexpr u8 FIFO_SIZE = 16;
     Queue<FIFOData, FIFO_SIZE> pxlFifo;
+
+    u8 lockedSCX;
 
     u8 numDiscardedPixels;
     u8 curPixelX;
     u8 line;
 
-    enum class LCDCFlag : u8 {
-        BG_WINDOW_ENABLE = 0,
-        SPRITE_ENABLE = 1,
-        SPRITE_SIZE = 2,
-        BG_TILE_SELECT = 3,
-        TILE_DATA_SELECT = 4,
-        WINDOW_ENABLE = 5,
-        WINDOW_TILE_SELECT = 6,
-        LCD_ENABLE = 7,
-    };
-
-    enum Mode : u8 {
-        H_BLANK = 0,
-        V_BLANK = 1,
-        OAM_SEARCH = 2,
-        LCD_TRANSFER = 3,
-    } mode;
     u8 statIntrFlags;  // 3: ly=lyc, 2: oam, 1: v-blank, 0: h-blank
-    bool statTrigger;
-    int modeSwitchClocks;
-    int lylycTriggerClock;
+    u8 internalStatEnable;
+    u16 lcdLineCycles;
+
+    // Mode mode;
 
     // ICE_CREAM_GB const u32 baseColors[4] = {0xFFFFF6D3, 0xFFF9A875, 0xFFEB6B6F, 0xFF7C3F58};
     // COLD_FIRE_GB const u32 baseColors[4] = {0xFFF6C6A8, 0xFFD17C7C, 0xFF5B768D, 0xFF46425E};
@@ -139,15 +177,4 @@ class PPU {
     // CANDYPOP const u32 baseColors[4] = {0xFFEEBFF5, 0xFF9E81D0, 0xFF854576, 0xFF301221};
     // CAVE4 const u32 baseColors[4] = {0xFFE4CBBF, 0xFF938282, 0xFF4F4E80, 0xFF2C0016};
     const u32 BLANK_COLOR = 0xFF101010;
-
-    void handle_pixel_push();
-
-    void background_fetch();
-    void sprite_fetch();
-
-    bool get_lcdc_flag(LCDCFlag flag);
-
-    void set_mode(Mode changeToMode);
-
-    u32 get_color(FIFOData&& data);
 };

@@ -26,20 +26,18 @@ void Debugger::print_info() {
     // print_reg(IOReg::SB_REG, "Serial Transfer Data");
     // print_reg(IOReg::SC_REG, "Serial Transfer Control");
 
-    print_reg(IOReg::DIV_REG, "Divide");
-    print_reg(IOReg::TIMA_REG, "Timer Counter");
-    print_reg(IOReg::TMA_REG, "Timer Modulo");
-    print_reg(IOReg::TAC_REG, "Timer Control");
+    // print_reg(IOReg::DIV_REG, "Divide");
+    // print_reg(IOReg::TIMA_REG, "Timer Counter");
+    // print_reg(IOReg::TMA_REG, "Timer Modulo");
+    // print_reg(IOReg::TAC_REG, "Timer Control");
 
-    /*
-    print_reg(IOReg::SCY_REG, "Y-Scoll");
-    print_reg(IOReg::SCX_REG, "X-Scoll");
-    print_reg(IOReg::BGP_REG, "Background Palette");
-    print_reg(IOReg::OBP0_REG, "Object Palette 0");
-    print_reg(IOReg::OBP1_REG, "Object Palette 1");
-    print_reg(IOReg::WY_REG, "Window Y");
-    print_reg(IOReg::WX_REG, "Window X");
-    */
+    // print_reg(IOReg::SCY_REG, "Y-Scoll");
+    // print_reg(IOReg::SCX_REG, "X-Scoll");
+    // print_reg(IOReg::BGP_REG, "Background Palette");
+    // print_reg(IOReg::OBP0_REG, "Object Palette 0");
+    // print_reg(IOReg::OBP1_REG, "Object Palette 1");
+    // print_reg(IOReg::WY_REG, "Window Y");
+    // print_reg(IOReg::WX_REG, "Window X");
 }
 
 bool Debugger::can_step() {
