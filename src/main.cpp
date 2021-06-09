@@ -86,7 +86,7 @@ constexpr double SAMPLES_PER_FRAME = Constants::SAMPLE_RATE / (1000.0 / Constant
 constexpr double FLOATING_OFF = SAMPLES_PER_FRAME - (int)SAMPLES_PER_FRAME;
 double frameAcc = 0;
 
-void run(Screen& screen, SDL_Joystick* gameController, GameBoy& gameboy, Debugger& debugger) {
+void run(Screen& screen, GameBoy& gameboy, Debugger& debugger) {
     SDL_Event e;
     bool running = true;
 
@@ -301,7 +301,7 @@ int main(int argc, char** argv) {
         try {
             gameboy.load(path.c_str());
             gameboy.print_cartridge_info();
-            run(screen, gameController, gameboy, debugger);
+            run(screen, gameboy, debugger);
         } catch (const std::exception& e) {
             std::cerr << e.what() << std::endl;
             SDL_Quit();

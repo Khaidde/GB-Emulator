@@ -17,8 +17,6 @@ void CPU::restart() {
     callbackCycle = 0;
 }
 
-bool test = false;
-extern u8 cnt;
 void CPU::handle_interrupts() {
     // TODO handle weird push to IE case
     u8 ifReg = memory->read(IOReg::IF_REG);
@@ -57,8 +55,6 @@ void CPU::emulate_cycle() {
             debugger->print_info();
         }
 
-        if (test) printf("cc=%d PC=%02x\n", cnt + 2, PC);
-
         if (halted) {
             return;
         }
@@ -76,7 +72,8 @@ void CPU::emulate_cycle() {
     }
 
     if (--cycleCnt == 0) {
-        PAUSE_EXEC_OCC(this, debugger, 0x48, 1);
+        // PAUSE_EXEC_OCC(this, debugger, 0x48, 1);
+        // PAUSE_EXEC(this, debugger, 0x2c3);
     }
 
     if (callbackCycle > 0) {

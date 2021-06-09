@@ -27,6 +27,16 @@ class Debugger {
     void init(CPU* c, Memory* memory);
 
    private:
+    int ppuCnt;
+    int ppuMode;
+
+   public:
+    void log_ppu(int mode, int cnt) {
+        ppuMode = mode;
+        ppuCnt = cnt;
+    }
+
+   private:
     void print_reg(u16 address, const char* name);
 
    public:
@@ -42,8 +52,6 @@ class Debugger {
    private:
     CPU* cpu;
     Memory* mem;
-
-    u8 ppuCycles;
 
     u8 stepCnt;
     bool pause;

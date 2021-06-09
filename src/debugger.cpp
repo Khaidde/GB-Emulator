@@ -13,13 +13,16 @@ void Debugger::print_reg(u16 address, const char* name) {
 }
 
 void Debugger::print_info() {
+    printf(" => %04x (PC)\n", cpu->PC);
     printf("\tZNHC=%d%d%d%d\n", cpu->check_flag(CPU::Z_FLAG), cpu->check_flag(CPU::N_FLAG),
            cpu->check_flag(CPU::H_FLAG), cpu->check_flag(CPU::C_FLAG));
-    printf("\tAF=%04x BC=%04x DE=%04x HL=%04x\n", cpu->AF.pair, cpu->BC.pair, cpu->DE.pair, cpu->HL.pair);
-    printf("\tSP=%04x PC=%04x\n", cpu->SP, cpu->PC);
+    printf("\tAF=%04x BC=%04x DE=%04x HL=%04x SP=%04x\n", cpu->AF.pair, cpu->BC.pair, cpu->DE.pair, cpu->HL.pair,
+           cpu->SP);
     printf("\time=%d if=%02x ie=%02x\n", cpu->ime, mem->read(IOReg::IF_REG), mem->read(IOReg::IE_REG));
     printf("\tly=%02x lcdc=%02x stat=%02x\n", mem->read(IOReg::LY_REG), mem->read(IOReg::LCDC_REG),
            mem->read(IOReg::STAT_REG));
+
+    printf("cc=%d (%d)\n", ppuCnt + 2, ppuMode);
 
     // print_reg(IOReg::JOYP_REG, "Joypad");
 

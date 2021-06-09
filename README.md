@@ -70,7 +70,7 @@ A Gameboy/Gameboy Color emulator aimed at accuracy. This project is meant to be 
 | lcdon_write_timing-GS       |        |                 |
 | stat_irq_blocking           |   x    |                 |
 | stat_lyc_onoff              |        |                 |
-| vblank_stat_intr-GS         |        |                 |
+| vblank_stat_intr-GS         |   x    |                 |
 
 ### acceptance
 

@@ -67,18 +67,18 @@ enum PPUMode : u8 {
 };
 
 enum class PPUState {
-    OAM_0,
     OAM_3,
     OAM_4,
-    LCD_0,
+    OAM,
     LCD_4,
-    H_BLANK_0,
+    LCD,
     H_BLANK_4,
+    H_BLANK,
 
-    V_BLANK_144_0,
-    V_BLANK_145_152_0,
-    V_BLANK_153_0,
+    V_BLANK_144_4,
+    V_BLANK_145_152_4,
     V_BLANK_153_4,
+    V_BLANK_153_12,
     V_BLANK,
 };
 
@@ -96,20 +96,23 @@ class PPU {
     PPU(Memory* memory);
     void restart();
     void set_debugger(Debugger& debugger) { this->debugger = &debugger; }
-    void render(u32* pixelBuffer);
-    void emulate_clock();
 
     void write_register(u16 addr, u8 val);
-
     bool is_vram_blocked();
     bool is_oam_blocked();
 
+    void render(u32* pixelBuffer);
+    void emulate_clock();
+
    private:
     void set_stat_mode(PPUMode statMode);
+    void update_coincidence();
     void try_lyc_intr();
     void try_mode_intr(u8 statMode);
-    void update_mode_intr(PPUMode statMode);
+    // void update_mode_intr(PPUMode statMode);
     void clear_stat_mode_intr(PPUMode statMode);
+
+    void try_trigger_stat();
 
     void handle_pixel_push();
 
@@ -142,7 +145,8 @@ class PPU {
     bool bufferSel;
     FrameBuffer frameBuffers[2];
 
-    u16 drawClocks;
+    short ppuClocks;
+    short clockCnt;
     PPUState curPPUState;
 
     SpriteList spriteList;
@@ -164,8 +168,8 @@ class PPU {
     u8 line;
 
     u8 statIntrFlags;  // 3: ly=lyc, 2: oam, 1: v-blank, 0: h-blank
+    u8 prevIntrFlags;
     u8 internalStatEnable;
-    u16 lcdLineCycles;
 
     // Mode mode;
 
