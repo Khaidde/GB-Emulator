@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "apu.hpp"
 #include "cartridge.hpp"
 #include "cpu.hpp"
@@ -13,7 +15,7 @@ class GameBoy {
    public:
     GameBoy();
     void load(const char* romPath);
-    void print_cartridge_info();
+    Cartridge* get_cartridge();
 
     void set_debugger(Debugger& debugger);
     void handle_key_code(bool pressed, JoypadButton button) { input.handle_input(pressed, (char)button); }
@@ -28,6 +30,8 @@ class GameBoy {
     Debugger* debugger;
 
     int totalTCycles;
+
+    std::unique_ptr<Cartridge> cartridge;
 
     Input input;
     Timer timer;

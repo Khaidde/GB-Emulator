@@ -108,9 +108,8 @@ void PPU::emulate_clock() {
         return;
     }
     ppuClocks++;
-    debugger->log_ppu((int)curPPUState, (clockCnt - 1) / 2);
-    if (clockCnt > 1) {
-        clockCnt--;
+    debugger->log_ppu((int)curPPUState, clockCnt / 2);
+    if (clockCnt-- > 1) {
         return;
     }
     switch (curPPUState) {
@@ -176,6 +175,7 @@ void PPU::emulate_clock() {
                 curPPUState = PPUState::LCD;
             }
         case PPUState::LCD:
+            clockCnt = 0;
             if (pxlFifo.size > 8 && !fetcher.curSprite) {
                 handle_pixel_push();
             }

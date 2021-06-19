@@ -29,16 +29,12 @@ struct MemoryOp {
 class Memory {
    public:
     void restart();
+    void set_cartridge(Cartridge* cartridge) { this->cartridge = cartridge; }
     void set_debugger(Debugger& debugger) { this->debug = &debugger; }
     void set_input(Input& input) { this->input = &input; }
     void set_timer(Timer& timer) { this->timer = &timer; }
     void set_ppu(PPU& ppu) { this->ppu = &ppu; }
     void set_apu(APU& apu) { this->apu = &apu; }
-
-    bool is_CGB() { return isCGB; }
-
-    void load_cartridge(const char* romPath);
-    void print_cartridge_info();
 
     void request_interrupt(Interrupt interrupt);
 
@@ -57,8 +53,7 @@ class Memory {
    private:
     Debugger* debug;
 
-    std::unique_ptr<Cartridge> cartridge;
-    bool isCGB;
+    Cartridge* cartridge;
 
     Input* input;
     Timer* timer;

@@ -1,7 +1,5 @@
 #include <SDL.h>
 #include <iostream>
-#include <tchar.h>
-#include <windows.h>
 
 #include "game_boy.hpp"
 
@@ -183,139 +181,66 @@ void run(Screen& screen, GameBoy& gameboy, Debugger& debugger) {
     }
 }
 
-void test_rom(GameBoy& gameboy, std::string path, std::string passOut, std::string failOut) {
-    gameboy.load(path.c_str());
-    size_t pIndex = 0;
-    size_t fIndex = 0;
-    bool running = true;
-    while (running) {
-        gameboy.emulate_frame();
-        if (gameboy.get_serial_out() == passOut[pIndex]) {
-            if (++pIndex == passOut.size()) {
-                running = false;
-                std::cout << "x PASSED: " << path << std::endl;
-            }
-        } else {
-            pIndex = 0;
-        }
-        if (gameboy.get_serial_out() == failOut[fIndex]) {
-            if (++fIndex == failOut.size()) {
-                running = false;
-                std::cout << "  FAILED: " << path << std::endl;
-            }
-        } else {
-            fIndex = 0;
-        }
-    }
-}
-
 }  // namespace
 
 int main(int argc, char** argv) {
-    if (argc < 2) {
+    if (argc != 2) {
         std::cerr << "Usage gbemu [romPath.gb/gbc]" << std::endl;
         return -1;
-    }
-    std::string path = argv[1];
-    bool tDir = false;
-    for (int i = 2; i < argc; i++) {
-        if (strcmp(argv[i], "-tdir") == 0) {
-            tDir = true;
-        } else {
-            std::cerr << "Unknown command line flag: " << argv[i] << std::endl;
-            return -1;
-        }
     }
 
     GameBoy gameboy;
     Debugger debugger;
     gameboy.set_debugger(debugger);
 
-    if (tDir) {
-        char cPath[MAX_PATH];
-        WIN32_FIND_DATA ffd;
-        if (_tcslen(path.c_str()) > MAX_PATH - 4) {
-            std::cerr << "Directory path too long." << std::endl;
-            return -1;
-        }
-        _tcsncpy(cPath, path.c_str(), MAX_PATH);
-        if (cPath[_tcslen(cPath) - 1] != '\\') {
-            _tcscat(cPath, "\\");
-        }
-        _tcscat(cPath, "*.*");
+    SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK);
 
-        HANDLE hFind = FindFirstFile(cPath, &ffd);
-        if (hFind == INVALID_HANDLE_VALUE) {
-            std::cerr << "Invalid handle value." << GetLastError() << std::endl;
-            return -1;
-        }
-
-        try {
-            bool running = true;
-            while (running) {
-                if (_tcscmp(ffd.cFileName, ".") != 0 && _tcscmp(ffd.cFileName, "..") != 0) {
-                    if (FileManagement::is_path_extension(ffd.cFileName, "gb")) {
-                        test_rom(gameboy, (path + "\\" + ffd.cFileName).c_str(), "\"", "B");
-                    } else if (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-                        // std::cout << "dir:" << ffd.cFileName << std::endl;
-                    }
-                }
-                running = FindNextFile(hFind, &ffd);
-            }
-        } catch (const std::exception& e) {
-            std::cerr << e.what() << std::endl;
+    SDL_Joystick* gameController;
+    if (SDL_NumJoysticks() > 0) {
+        gameController = SDL_JoystickOpen(0);
+        if (gameController == nullptr) {
+            std::cerr << "Could not open game controller." << std::endl;
+            SDL_Quit();
             return -1;
         }
     } else {
-        SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK);
-
-        SDL_Joystick* gameController;
-        if (SDL_NumJoysticks() > 0) {
-            gameController = SDL_JoystickOpen(0);
-            if (gameController == nullptr) {
-                std::cerr << "Could not open game controller." << std::endl;
-                SDL_Quit();
-                return -1;
-            }
-        } else {
-            gameController = nullptr;
-        }
-
-        SDL_AudioSpec spec;
-        spec.freq = Constants::SAMPLE_RATE;
-        spec.format = AUDIO_S16SYS;
-        spec.channels = 2;
-        spec.samples = SAMPLE_SIZE;
-        spec.callback = nullptr;
-        if (SDL_OpenAudio(&spec, 0) != 0) {
-            std::cerr << "Could not open audio." << std::endl;
-            SDL_Quit();
-            return -1;
-        }
-        SDL_PauseAudio(0);
-
-        Screen screen;
-        create_screen(screen, Constants::WIDTH * Screen::PIXEL_SCALE, Constants::HEIGHT * Screen::PIXEL_SCALE,
-                      Constants::TITLE);
-
-        try {
-            gameboy.load(path.c_str());
-            gameboy.print_cartridge_info();
-            run(screen, gameboy, debugger);
-        } catch (const std::exception& e) {
-            std::cerr << e.what() << std::endl;
-            SDL_Quit();
-            return -1;
-        }
-
-        destroy_screen(screen);
-        SDL_CloseAudio();
-
-        SDL_JoystickClose(gameController);
         gameController = nullptr;
-
-        SDL_Quit();
     }
+
+    SDL_AudioSpec spec;
+    spec.freq = Constants::SAMPLE_RATE;
+    spec.format = AUDIO_S16SYS;
+    spec.channels = 2;
+    spec.samples = SAMPLE_SIZE;
+    spec.callback = nullptr;
+    if (SDL_OpenAudio(&spec, 0) != 0) {
+        std::cerr << "Could not open audio." << std::endl;
+        SDL_Quit();
+        return -1;
+    }
+    SDL_PauseAudio(0);
+
+    Screen screen;
+    create_screen(screen, Constants::WIDTH * Screen::PIXEL_SCALE, Constants::HEIGHT * Screen::PIXEL_SCALE,
+                  Constants::TITLE);
+
+    try {
+        gameboy.load(argv[1]);
+        gameboy.get_cartridge()->print_cartridge_info();
+        run(screen, gameboy, debugger);
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+        SDL_Quit();
+        return -1;
+    }
+
+    destroy_screen(screen);
+    SDL_CloseAudio();
+
+    SDL_JoystickClose(gameController);
+    gameController = nullptr;
+
+    SDL_Quit();
 
     return 0;
 }

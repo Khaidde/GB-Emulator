@@ -1,8 +1,5 @@
 #include "memory.hpp"
 
-#include <fstream>
-#include <vector>
-
 namespace {
 
 constexpr u8 DMG_BOOT_IO[] = {
@@ -30,46 +27,6 @@ void Memory::restart() {
     scheduledMemoryOps.clear();
     reset_cycles();
 }
-
-void Memory::load_cartridge(const char* romPath) {
-    std::ifstream file(romPath, std::ios::binary | std::ios::ate);
-    if (!file.is_open()) {
-        fatal("Can't read from file: %s\n", romPath);
-    }
-
-    isCGB = FileManagement::is_path_extension(romPath, ".gbc");
-    if (isCGB) {
-        fatal("TODO gameboy color games are not yet supported!\n");
-    }
-
-    size_t romSize = file.tellg();
-    std::vector<u8> rom(romSize);
-    file.seekg(0);
-    file.read((char*)&rom[0], romSize);
-    file.close();
-
-    switch (rom[0x0147]) {
-        case 0x00:
-            cartridge = std::make_unique<ROMOnly>(&rom[0]);
-            break;
-        case 0x01:
-            cartridge = std::make_unique<MBC1>(&rom[0]);
-            break;
-        case 0x02:
-            cartridge = std::make_unique<MBC1>(&rom[0]);
-            cartridge->setHasRam(true);
-            break;
-        case 0x03:
-            cartridge = std::make_unique<MBC1>(&rom[0]);
-            cartridge->setHasRam(true);
-            cartridge->setHasBattery(true);
-            break;
-        default:
-            fatal("Unimplemented cartridge type: %d\n", rom[0x0147]);
-    }
-}
-
-void Memory::print_cartridge_info() { cartridge->print_cartridge_info(); }
 
 void Memory::request_interrupt(Interrupt interrupt) { write(IOReg::IF_REG, read(IOReg::IF_REG) | (u8)interrupt); }
 
@@ -166,8 +123,8 @@ void Memory::write(u16 addr, u8 val) {
             mem[addr] = 0xF8 | (val & 0x7);
             break;
         case IOReg::DMA_REG:
-            if (0xFE <= val && val <= 0xFF) {
-                fatal("TODO illegal DMA source value: %d\n", val);
+            if (val >= 0xFE) {
+                fatal("TODO illegal DMA source value: %02x\n", val);
                 val = mem[addr];
             }
             scheduleDma = true;

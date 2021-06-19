@@ -3,7 +3,7 @@
 #include "general.hpp"
 
 class Cartridge {
-   public:
+public:
     Cartridge(const char* cartName, u8* rom);
     virtual ~Cartridge() = default;
     virtual u8 read(u16 addr) = 0;
@@ -13,10 +13,12 @@ class Cartridge {
     void setHasBattery(bool cartHasBattery) { this->hasBattery = cartHasBattery; }
     void setHasTimer(bool cartHasTimer) { this->hasTimer = cartHasTimer; }
 
-    u8 read_header(u16 addr);
     void print_cartridge_info();
 
-   protected:
+private:
+    u8 read_header(u16 addr);
+
+protected:
     const char* cartName;
 
     static constexpr u16 HEADER_START = 0x104;
@@ -35,25 +37,25 @@ class Cartridge {
 };
 
 class ROMOnly : public Cartridge {
-   public:
+public:
     explicit ROMOnly(u8* rom);
     u8 read(u16 addr) override;
     void write(u16 addr, u8 val) override;
 
-   private:
+private:
     static constexpr u16 ROM_SIZE = 0x8000;
     u8 rom[ROM_SIZE];
 };
 
 class MBC1 : public Cartridge {
-   public:
+public:
     MBC1(u8* rom);
     ~MBC1() override;
     u8 read(u16 addr) override;
     void write(u16 addr, u8 val) override;
     void update_banks();
 
-   private:
+private:
     static constexpr u16 ROM_BANK_SIZE = 0x4000;
     using RomBank = u8[ROM_BANK_SIZE];
     static constexpr u8 MAX_ROM_BANKS = 128;

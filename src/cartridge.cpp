@@ -55,8 +55,6 @@ Cartridge::Cartridge(const char* cartName, u8* rom) : cartName(cartName) {
     }
 }
 
-u8 Cartridge::read_header(u16 addr) { return header[addr - HEADER_START]; }
-
 void Cartridge::print_cartridge_info() {
     char title[15];
     int t = 0;
@@ -94,6 +92,8 @@ void Cartridge::print_cartridge_info() {
     }
     printf("Checksum: %s\n", ((x & 0xF) == read_header(0x014D)) ? "PASSED" : "FAILED");
 }
+
+u8 Cartridge::read_header(u16 addr) { return header[addr - HEADER_START]; }
 
 ROMOnly::ROMOnly(u8* rom) : Cartridge("ROM Only", rom) {
     for (int i = 0; i < ROM_SIZE; i++) {
@@ -143,6 +143,7 @@ MBC1::~MBC1() {
         printf("TODO Saving game...\n");
     }
     delete[] romBanks;
+    delete[] ramBanks;
 }
 
 u8 MBC1::read(u16 addr) {
