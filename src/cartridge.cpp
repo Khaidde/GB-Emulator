@@ -1,5 +1,6 @@
 #include "cartridge.hpp"
 
+#include <fstream>
 #include <string>
 
 namespace {
@@ -16,7 +17,7 @@ constexpr const char* ROM_SIZES[] = {
 };
 constexpr struct {
     const char* desc;
-    char numBanks;
+    u16 numBanks;
 } RAM_SIZES[] = {
     {"None", 0},
     {"2 KBytes", 1},
@@ -27,7 +28,8 @@ constexpr struct {
 };
 }  // namespace
 
-Cartridge::Cartridge(const char* cartName, u8* rom) : cartName(cartName) {
+Cartridge::Cartridge(const char* cartName, const char* filePath, u8* rom)
+    : cartridgeName(cartName), filePath(filePath) {
     for (int i = 0; i < HEADER_SIZE; i++) {
         header[i] = rom[HEADER_START + i];
     }
@@ -55,8 +57,17 @@ Cartridge::Cartridge(const char* cartName, u8* rom) : cartName(cartName) {
     }
 }
 
+void Cartridge::save_to_file(std::vector<u8>& ram) {
+    std::string savePath = FileManagement::change_extension(filePath, ".sav");
+    printf("Saving game to file: %s\n", savePath.c_str());
+
+    std::ofstream saveFileStream(savePath, std::ios::binary);
+    saveFileStream.write((char*)(&ram[0]), (std::streamsize)ram.size());
+    saveFileStream.close();
+}
+
 void Cartridge::print_cartridge_info() {
-    char title[15];
+    u8 title[15];
     int t = 0;
     for (int c = 0x134; c < 0x143; c++) {
         title[t++] = read_header(c);
@@ -76,7 +87,13 @@ void Cartridge::print_cartridge_info() {
     printf("ROM Size: %s\n", ROM_SIZES[romType]);
     printf("RAM Size: %s\n", RAM_SIZES[ramType].desc);
 
-    std::string cartridgeType(cartName);
+    if (read_header(0x146) == 0x00) {
+        printf("No SGB functions\n");
+    } else if (read_header(0x146) == 0x03) {
+        printf("Game supports SGB functions\n");
+    }
+
+    std::string cartridgeType(cartridgeName);
     if (hasRam) cartridgeType += " + ram";
     if (hasBattery) cartridgeType += " + battery";
     if (hasTimer) cartridgeType += " + timer";
@@ -95,7 +112,7 @@ void Cartridge::print_cartridge_info() {
 
 u8 Cartridge::read_header(u16 addr) { return header[addr - HEADER_START]; }
 
-ROMOnly::ROMOnly(u8* rom) : Cartridge("ROM Only", rom) {
+ROMOnly::ROMOnly(const char* filePath, u8* rom) : Cartridge("ROM Only", filePath, rom) {
     for (int i = 0; i < ROM_SIZE; i++) {
         this->rom[i] = rom[i];
     }
@@ -112,7 +129,7 @@ void ROMOnly::write(u16 addr, u8 val) {
     printf("Warning: Attempting to write to rom only cartridge, addr=%02x val=%02x.\n", addr, val);
 }
 
-MBC1::MBC1(u8* rom) : Cartridge("MBC1", rom) {
+MBC1::MBC1(const char* filePath, u8* rom) : Cartridge("MBC1", filePath, rom) {
     if (numRomBanks > MAX_ROM_BANKS) {
         printf("Incompatible number of rom banks for MBC1: %d\n", numRomBanks);
         return;
@@ -140,10 +157,24 @@ MBC1::MBC1(u8* rom) : Cartridge("MBC1", rom) {
 
 MBC1::~MBC1() {
     if (hasBattery) {
-        printf("TODO Saving game...\n");
+        std::vector<u8> ram;
+        ram.reserve(numRamBanks * RAM_BANK_SIZE);
+        for (int i = 0; i < numRamBanks; i++) {
+            ram.insert(ram.begin() + (i * RAM_BANK_SIZE), std::begin(ramBanks[i]),
+                       std::end(ramBanks[i]));
+        }
+        save_to_file(ram);
     }
     delete[] romBanks;
     delete[] ramBanks;
+}
+
+void MBC1::load_save_ram(u8* ram) {
+    for (int i = 0; i < numRamBanks; i++) {
+        for (int k = 0; k < RAM_BANK_SIZE; k++) {
+            this->ramBanks[i][k] = ram[i * RAM_BANK_SIZE + k];
+        }
+    }
 }
 
 u8 MBC1::read(u16 addr) {
@@ -210,3 +241,13 @@ void MBC1::update_banks() {
         activeRamBank = &ramBanks[bank2Num];
     }
 }
+
+MBC5::MBC5(const char* filePath, u8* rom) : Cartridge("MBC5", filePath, rom) {}
+
+MBC5::~MBC5() {}
+
+u8 MBC5::read(u16) { return 0; }
+
+void MBC5::write(u16, u8) {}
+
+void MBC5::update_banks() {}

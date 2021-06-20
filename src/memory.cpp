@@ -1,7 +1,7 @@
 #include "memory.hpp"
 
 namespace {
-
+// clang-format off
 constexpr u8 DMG_BOOT_IO[] = {
     0xCF, 0x00, 0x7E, 0xFF, 0xAB, 0x00, 0x00, 0xF8, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xE1,  // FF00
     0x80, 0xBF, 0xF3, 0xFF, 0xBF, 0xFF, 0x3F, 0x00, 0xFF, 0xBF, 0x7F, 0xFF, 0x9F, 0xFF, 0xBF, 0xFF,  // FF10
@@ -9,8 +9,9 @@ constexpr u8 DMG_BOOT_IO[] = {
     0x92, 0xFF, 0x20, 0xEA, 0x86, 0x7D, 0x14, 0x7E, 0x96, 0x7F, 0x00, 0xB9, 0x2C, 0x7A, 0x86, 0x3A,  // FF30
     0x91, 0x85, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFC, 0xFF, 0xFF, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF,  // FF40
 };
+// clang-format on
 
-}
+}  // namespace
 
 void Memory::restart() {
     for (int i = 0xFF00; i < 0xFF50; i++) {
@@ -28,7 +29,9 @@ void Memory::restart() {
     reset_cycles();
 }
 
-void Memory::request_interrupt(Interrupt interrupt) { write(IOReg::IF_REG, read(IOReg::IF_REG) | (u8)interrupt); }
+void Memory::request_interrupt(Interrupt interrupt) {
+    write(IOReg::IF_REG, read(IOReg::IF_REG) | (u8)interrupt);
+}
 
 u8& Memory::ref(u16 addr) { return mem[addr]; }
 
@@ -125,7 +128,6 @@ void Memory::write(u16 addr, u8 val) {
         case IOReg::DMA_REG:
             if (val >= 0xFE) {
                 fatal("TODO illegal DMA source value: %02x\n", val);
-                val = mem[addr];
             }
             scheduleDma = true;
             dmaStartAddr = val << 8;
@@ -139,9 +141,13 @@ void Memory::write(u16 addr, u8 val) {
     }
 }
 
-void Memory::schedule_read(u16 addr, u8* dest, u8 cycle) { scheduledMemoryOps.push_tail({cycle, addr, false, {dest}}); }
+void Memory::schedule_read(u16 addr, u8* dest, u8 cycle) {
+    scheduledMemoryOps.push_tail({cycle, addr, false, {dest}});
+}
 
-void Memory::schedule_write(u16 addr, u8* val, u8 cycle) { scheduledMemoryOps.push_tail({cycle, addr, true, {val}}); }
+void Memory::schedule_write(u16 addr, u8* val, u8 cycle) {
+    scheduledMemoryOps.push_tail({cycle, addr, true, {val}});
+}
 
 void Memory::emulate_dma_cycle() {
     if (dmaCycleCnt > 0) {

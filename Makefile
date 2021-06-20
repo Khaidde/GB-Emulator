@@ -31,7 +31,8 @@ ifeq ($(shell which clang++),)
 $(error Could not find path to clang)
 else
 CC := clang
-CFLAGS += -Werror -Wall
+CFLAGS += -std=c++17 -Werror -Wpedantic -Wsign-conversion
+CFLAGS += -Wno-gnu-anonymous-struct -Wno-language-extension-token
 LDFLAGS := -lshell32 -lSDL2main -lSDL2
 endif
 

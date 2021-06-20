@@ -1,14 +1,14 @@
 #pragma once
 
+#include <memory>
+
 #include "apu.hpp"
 #include "cartridge.hpp"
 #include "debugger.hpp"
+#include "general.hpp"
 #include "input.hpp"
 #include "ppu.hpp"
 #include "timer.hpp"
-#include "general.hpp"
-
-#include <memory>
 
 class Debugger;
 class Timer;
@@ -27,14 +27,14 @@ struct MemoryOp {
 };
 
 class Memory {
-   public:
+public:
     void restart();
     void set_cartridge(Cartridge* cartridge) { this->cartridge = cartridge; }
-    void set_debugger(Debugger& debugger) { this->debug = &debugger; }
-    void set_input(Input& input) { this->input = &input; }
-    void set_timer(Timer& timer) { this->timer = &timer; }
-    void set_ppu(PPU& ppu) { this->ppu = &ppu; }
-    void set_apu(APU& apu) { this->apu = &apu; }
+    void set_debugger(Debugger& debugger) { this->debugger = &debugger; }
+    void set_input(Input& in) { this->input = &in; }
+    void set_timer(Timer& time) { this->timer = &time; }
+    void set_ppu(PPU& p) { this->ppu = &p; }
+    void set_apu(APU& a) { this->apu = &a; }
 
     void request_interrupt(Interrupt interrupt);
 
@@ -50,8 +50,8 @@ class Memory {
     void emulate_cycle();
     void reset_cycles();
 
-   private:
-    Debugger* debug;
+private:
+    Debugger* debugger;
 
     Cartridge* cartridge;
 

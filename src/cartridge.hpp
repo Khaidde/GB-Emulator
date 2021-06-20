@@ -1,17 +1,21 @@
 #pragma once
 
+#include <vector>
+
 #include "general.hpp"
 
 class Cartridge {
 public:
-    Cartridge(const char* cartName, u8* rom);
+    Cartridge(const char* cartName, const char* filePath, u8* rom);
     virtual ~Cartridge() = default;
+    virtual void load_save_ram(u8* ram){};
+    void save_to_file(std::vector<u8>& ram);
     virtual u8 read(u16 addr) = 0;
     virtual void write(u16 addr, u8 val) = 0;
 
-    void setHasRam(bool cartHasRam) { this->hasRam = cartHasRam; }
-    void setHasBattery(bool cartHasBattery) { this->hasBattery = cartHasBattery; }
-    void setHasTimer(bool cartHasTimer) { this->hasTimer = cartHasTimer; }
+    void set_has_ram(bool cartHasRam) { this->hasRam = cartHasRam; }
+    void set_has_battery(bool cartHasBattery) { this->hasBattery = cartHasBattery; }
+    void set_has_timer(bool cartHasTimer) { this->hasTimer = cartHasTimer; }
 
     void print_cartridge_info();
 
@@ -19,7 +23,8 @@ private:
     u8 read_header(u16 addr);
 
 protected:
-    const char* cartName;
+    const char* cartridgeName;
+    const char* filePath;
 
     static constexpr u16 HEADER_START = 0x104;
     static constexpr u16 HEADER_SIZE = 0x150 - HEADER_START;
@@ -38,7 +43,7 @@ protected:
 
 class ROMOnly : public Cartridge {
 public:
-    explicit ROMOnly(u8* rom);
+    ROMOnly(const char* filePath, u8* rom);
     u8 read(u16 addr) override;
     void write(u16 addr, u8 val) override;
 
@@ -49,8 +54,9 @@ private:
 
 class MBC1 : public Cartridge {
 public:
-    MBC1(u8* rom);
+    MBC1(const char* filePath, u8* rom);
     ~MBC1() override;
+    void load_save_ram(u8* ram) override;
     u8 read(u16 addr) override;
     void write(u16 addr, u8 val) override;
     void update_banks();
@@ -78,4 +84,16 @@ private:
 
     bool ramg;  // RAMG - ram gate register, enable or disable ram
     bool mode;
+};
+
+class MBC5 : public Cartridge {
+public:
+    MBC5(const char* filePath, u8* rom);
+    ~MBC5() override;
+    u8 read(u16 addr) override;
+    void write(u16 addr, u8 val) override;
+    void update_banks();
+
+private:
+    static constexpr u8 MAX_ROM_BANKS = 128;
 };

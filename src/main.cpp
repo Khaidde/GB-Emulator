@@ -1,4 +1,5 @@
 #include <SDL.h>
+
 #include <iostream>
 
 #include "game_boy.hpp"
@@ -17,17 +18,19 @@ struct Screen {
 };
 
 void create_screen(Screen& screen, int width, int height, const char* title) {
-    screen.window =
-        SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_SHOWN);
+    screen.window = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width,
+                                     height, SDL_WINDOW_SHOWN);
 
     if (!screen.window) {
         std::cerr << "Window could not be created! SDL_error: " << SDL_GetError() << std::endl;
     }
     screen.renderer = SDL_CreateRenderer(screen.window, -1, SDL_RENDERER_SOFTWARE);
-    screen.bufferTexture = SDL_CreateTexture(screen.renderer, SDL_PIXELFORMAT_RGB888, SDL_TEXTUREACCESS_STREAMING,
-                                             Constants::WIDTH, Constants::HEIGHT);
+    screen.bufferTexture =
+        SDL_CreateTexture(screen.renderer, SDL_PIXELFORMAT_RGB888, SDL_TEXTUREACCESS_STREAMING,
+                          Constants::WIDTH, Constants::HEIGHT);
     if (!screen.bufferTexture) {
-        std::cerr << "Failed to create back buffer texture! SDL_error: " << SDL_GetError() << std::endl;
+        std::cerr << "Failed to create back buffer texture! SDL_error: " << SDL_GetError()
+                  << std::endl;
     }
 
     screen.pitch = 0;
@@ -157,13 +160,14 @@ void run(Screen& screen, GameBoy& gameboy, Debugger& debugger) {
 
         SDL_RenderClear(screen.renderer);
 
-        if (SDL_LockTexture(screen.bufferTexture, nullptr, (void**)&screen.pixelBuffer, &screen.pitch)) {
+        if (SDL_LockTexture(screen.bufferTexture, nullptr, (void**)&screen.pixelBuffer,
+                            &screen.pitch)) {
             fatal("Failed to lock texture! SDL_error: %s\n", SDL_GetError());
         }
         screen.pitch /= sizeof(u32);
 
         frameAcc += FLOATING_OFF;
-        int sampleLen = ((int)SAMPLES_PER_FRAME + (frameAcc >= 1)) * 2;
+        u32 sampleLen = ((int)SAMPLES_PER_FRAME + (frameAcc >= 1)) * 2;
         gameboy.emulate_frame(screen.pixelBuffer, sampleBuffer, sampleLen);
         SDL_QueueAudio(1, sampleBuffer, sampleLen * sizeof(u16));
         frameAcc -= frameAcc >= 1;
@@ -176,7 +180,7 @@ void run(Screen& screen, GameBoy& gameboy, Debugger& debugger) {
         nextFrame += Constants::MS_PER_FRAME;
         double delay = nextFrame - SDL_GetTicks();
         if (delay > 0) {
-            SDL_Delay(delay);
+            SDL_Delay((u32)delay);
         }
     }
 }
@@ -213,7 +217,7 @@ int main(int argc, char** argv) {
     spec.channels = 2;
     spec.samples = SAMPLE_SIZE;
     spec.callback = nullptr;
-    if (SDL_OpenAudio(&spec, 0) != 0) {
+    if (SDL_OpenAudio(&spec, nullptr) != 0) {
         std::cerr << "Could not open audio." << std::endl;
         SDL_Quit();
         return -1;
@@ -221,8 +225,8 @@ int main(int argc, char** argv) {
     SDL_PauseAudio(0);
 
     Screen screen;
-    create_screen(screen, Constants::WIDTH * Screen::PIXEL_SCALE, Constants::HEIGHT * Screen::PIXEL_SCALE,
-                  Constants::TITLE);
+    create_screen(screen, Constants::WIDTH * Screen::PIXEL_SCALE,
+                  Constants::HEIGHT * Screen::PIXEL_SCALE, Constants::TITLE);
 
     try {
         gameboy.load(argv[1]);

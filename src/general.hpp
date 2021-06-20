@@ -1,8 +1,8 @@
 #pragma once
 
 #include <cstdint>
-#include <stdexcept>
 #include <cstring>
+#include <stdexcept>
 
 using u8 = uint8_t;
 using u16 = uint16_t;
@@ -18,7 +18,9 @@ using s16 = int16_t;
 
 namespace FileManagement {
 
-bool is_path_extension(const char* romPath, const char* extension);
+bool is_path_extension(const char* path, const char* extension);
+
+std::string change_extension(const char* path, const char* extension);
 
 }  // namespace FileManagement
 

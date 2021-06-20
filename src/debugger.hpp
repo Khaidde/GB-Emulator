@@ -1,8 +1,8 @@
 #pragma once
 
 #include "cpu.hpp"
-#include "memory.hpp"
 #include "general.hpp"
+#include "memory.hpp"
 
 class CPU;
 class Memory;
@@ -23,23 +23,23 @@ class Memory;
     }
 
 class Debugger {
-   public:
+public:
     void init(CPU* c, Memory* memory);
 
-   private:
+private:
     int ppuCnt;
     int ppuMode;
 
-   public:
+public:
     void log_ppu(int mode, int cnt) {
         ppuMode = mode;
         ppuCnt = cnt;
     }
 
-   private:
+private:
     void print_reg(u16 address, const char* name);
 
-   public:
+public:
     void print_info();
 
     bool can_step();
@@ -49,9 +49,9 @@ class Debugger {
     void continue_exec() { pause = false; }
     bool is_paused() { return pause; }
 
-   private:
+private:
     CPU* cpu;
-    Memory* mem;
+    Memory* memory;
 
     u8 stepCnt;
     bool pause;

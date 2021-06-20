@@ -12,21 +12,23 @@
 #include "timer.hpp"
 
 class GameBoy {
-   public:
+public:
     GameBoy();
     void load(const char* romPath);
     Cartridge* get_cartridge();
 
     void set_debugger(Debugger& debugger);
-    void handle_key_code(bool pressed, JoypadButton button) { input.handle_input(pressed, (char)button); }
+    void handle_key_code(bool pressed, JoypadButton button) {
+        input.handle_input(pressed, (u8)button);
+    }
 
     void emulate_frame();
     void emulate_frame(u32* screenBuffer, s16* sampleBuffer, u16 sampleLen);
 
     // TODO there might be several serial out values per frame
-    char get_serial_out();
+    u8 get_serial_out();
 
-   private:
+private:
     Debugger* debugger;
 
     int totalTCycles;

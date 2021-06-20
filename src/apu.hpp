@@ -21,7 +21,7 @@ struct SampleQueue {
 
 template <int maxLoad>
 class LengthCounter {
-   public:
+public:
     void set_disable_target(bool& enabled);
     void set_length_enabled(bool enabled);
     void set_load(u8 lengthLoad);
@@ -31,7 +31,7 @@ class LengthCounter {
 
     bool is_active();
 
-   private:
+private:
     bool* enabled;
 
     bool lengthEnabled = false;
@@ -41,7 +41,7 @@ class LengthCounter {
 };
 
 class VolumeEnvelope {
-   public:
+public:
     void write_volume_registers(u8 val);
 
     void trigger();
@@ -49,7 +49,7 @@ class VolumeEnvelope {
 
     u8 get_volume();
 
-   private:
+private:
     u8 volume;
     u8 startingVolume;
     bool volumeAddMode;
@@ -59,7 +59,7 @@ class VolumeEnvelope {
 };
 
 class SquareChannel {
-   public:
+public:
     SquareChannel();
     void write_registers(char regType, u8 val);
     void update_frequency();
@@ -77,7 +77,7 @@ class SquareChannel {
     bool leftEnable;
     bool rightEnable;
 
-   private:
+private:
     bool enabled = false;
     bool dacEnabled = false;
 
@@ -104,7 +104,7 @@ class SquareChannel {
 };
 
 class WaveChannel {
-   public:
+public:
     WaveChannel();
     void set_samples(u8* samples);
     void write_registers(char regType, u8 val);
@@ -121,7 +121,7 @@ class WaveChannel {
     bool leftEnable;
     bool rightEnable;
 
-   private:
+private:
     bool enabled;
     bool dacEnabled;
 
@@ -141,7 +141,7 @@ class WaveChannel {
 };
 
 class NoiseChannel {
-   public:
+public:
     NoiseChannel();
     void write_registers(char regType, u8 val);
 
@@ -157,7 +157,7 @@ class NoiseChannel {
     bool leftEnable;
     bool rightEnable;
 
-   private:
+private:
     bool enabled = false;
     bool dacEnabled = false;
 
@@ -174,8 +174,8 @@ class NoiseChannel {
 };
 
 class APU {
-   public:
-    APU(Memory* memory);
+public:
+    APU(Memory& memory);
     void restart();
     void sample(s16* sampleBuffer, u16 sampleLen);
     void emulate_clock();
@@ -183,7 +183,7 @@ class APU {
     u8 read_register(u8 originalVal, u8 ioReg);
     void write_register(u8 ioReg, u8 val);
 
-   private:
+private:
     Memory* memory;
 
     short frameSequenceClocks;

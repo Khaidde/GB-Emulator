@@ -1,8 +1,8 @@
 #pragma once
 
 #include "debugger.hpp"
-#include "memory.hpp"
 #include "general.hpp"
+#include "memory.hpp"
 
 class Memory;
 class Debugger;
@@ -16,17 +16,17 @@ union RegPair {
 };
 
 class CPU {
-   public:
+public:
     CPU() { restart(); }
-    void set_memory(Memory& memory) { this->memory = &memory; }
-    void set_debugger(Debugger& debugger) { this->debugger = &debugger; }
+    void set_memory(Memory& mem) { this->memory = &mem; }
+    void set_debugger(Debugger& debug) { this->debugger = &debug; }
     void restart();
 
     void handle_interrupts();
-    bool isFetching();
+    bool is_fetching();
     void emulate_cycle();
 
-   private:
+private:
     friend class Debugger;
     Debugger* debugger;
 

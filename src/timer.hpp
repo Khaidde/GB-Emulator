@@ -5,8 +5,8 @@
 class Memory;
 
 class Timer {
-   public:
-    Timer(Memory* memory);
+public:
+    Timer(Memory& memory);
     void restart();
     void emulate_clock();
 
@@ -14,7 +14,7 @@ class Timer {
     void set_enable(bool isEnabled);
     void set_frequency(u8 mode);
 
-   private:
+private:
     Memory* memory;
 
     u8* div;

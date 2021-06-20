@@ -1,26 +1,27 @@
 #include "debugger.hpp"
 
-void Debugger::init(CPU* c, Memory* memory) {
-    this->cpu = c;
-    this->mem = memory;
+void Debugger::init(CPU* cpu, Memory* memory) {
+    this->cpu = cpu;
+    this->memory = memory;
 
     stepCnt = 0;
     pause = false;
 }
 
 void Debugger::print_reg(u16 address, const char* name) {
-    printf("\t%2.4x: %02x (%s)\n", address, mem->read(address), name);
+    printf("\t%2.4x: %02x (%s)\n", address, memory->read(address), name);
 }
 
 void Debugger::print_info() {
     printf(" => %04x (PC)\n", cpu->PC);
     printf("\tZNHC=%d%d%d%d\n", cpu->check_flag(CPU::Z_FLAG), cpu->check_flag(CPU::N_FLAG),
            cpu->check_flag(CPU::H_FLAG), cpu->check_flag(CPU::C_FLAG));
-    printf("\tAF=%04x BC=%04x DE=%04x HL=%04x SP=%04x\n", cpu->AF.pair, cpu->BC.pair, cpu->DE.pair, cpu->HL.pair,
-           cpu->SP);
-    printf("\time=%d if=%02x ie=%02x\n", cpu->ime, mem->read(IOReg::IF_REG), mem->read(IOReg::IE_REG));
-    printf("\tly=%02x lcdc=%02x stat=%02x\n", mem->read(IOReg::LY_REG), mem->read(IOReg::LCDC_REG),
-           mem->read(IOReg::STAT_REG));
+    printf("\tAF=%04x BC=%04x DE=%04x HL=%04x SP=%04x\n", cpu->AF.pair, cpu->BC.pair, cpu->DE.pair,
+           cpu->HL.pair, cpu->SP);
+    printf("\time=%d if=%02x ie=%02x\n", cpu->ime, memory->read(IOReg::IF_REG),
+           memory->read(IOReg::IE_REG));
+    printf("\tly=%02x lcdc=%02x stat=%02x\n", memory->read(IOReg::LY_REG),
+           memory->read(IOReg::LCDC_REG), memory->read(IOReg::STAT_REG));
 
     printf("cc=%d (%d)\n", ppuCnt + 2, ppuMode);
 

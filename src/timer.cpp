@@ -2,9 +2,9 @@
 
 #include "memory.hpp"
 
-Timer::Timer(Memory* memory) : memory(memory) {
-    div = &memory->ref(IOReg::DIV_REG);
-    tima = &memory->ref(IOReg::TIMA_REG);
+Timer::Timer(Memory& memory) : memory(&memory) {
+    div = &memory.ref(IOReg::DIV_REG);
+    tima = &memory.ref(IOReg::TIMA_REG);
 }
 
 void Timer::restart() {

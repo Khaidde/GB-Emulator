@@ -1,5 +1,8 @@
 #include "input.hpp"
+
 #include "memory.hpp"
+
+Input::Input(Memory& memory) : memory(&memory) {}
 
 void Input::restart() { keyState = 0xFF; }
 

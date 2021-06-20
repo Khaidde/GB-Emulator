@@ -47,10 +47,10 @@ void CPU::handle_interrupts() {
     }
 }
 
-bool CPU::isFetching() { return cycleCnt == 0; }
+bool CPU::is_fetching() { return cycleCnt == 0; }
 
 void CPU::emulate_cycle() {
-    if (isFetching()) {
+    if (is_fetching()) {
         if (debugger->is_paused()) {
             debugger->print_info();
         }
@@ -94,7 +94,7 @@ void CPU::execute(u8 opcode) {
             // This allows double speed mode on CGB to work
 
             PC++;  // Stop instruction will skip the immediate next byte
-            break; 
+            break;
         case 0x76:  // HALT
             halted = ime || !(memory->read(IOReg::IF_REG) & memory->read(IOReg::IE_REG) & 0x1F);
             if (!halted) haltBug = true;
@@ -211,7 +211,7 @@ void CPU::execute(u8 opcode) {
         case 0xC1: pop(BC.pair); break; // POP BC
         case 0xD1: pop(DE.pair); break; // POP DE
         case 0xE1: pop(HL.pair); break; // POP HL
-        case 0xF1: 
+        case 0xF1:
             AF.lo = (read(SP++) & 0xF0) | (AF.lo & 0xF);
             skd_read(SP++, AF.hi);
             break; // POP AF
@@ -227,7 +227,7 @@ void CPU::execute(u8 opcode) {
             write(addr + 1, SP >> 8);
         } break; // LD (nn), SP
         case 0xF9: cycleCnt++; SP = HL.pair; break; // LD SP, HL
-        // ADD A, reg8 
+        // ADD A, reg8
         case 0x80: add8(BC.hi); break;         // ADD A, B
         case 0x81: add8(BC.lo); break;         // ADD A, C
         case 0x82: add8(DE.hi); break;         // ADD A, D
@@ -237,7 +237,7 @@ void CPU::execute(u8 opcode) {
         case 0x86: add8(read(HL.pair)); break; // ADD A, (HL)
         case 0x87: add8(AF.hi); break;         // ADD A, A
         case 0xC6: add8(n()); break;           // ADD A, n
-        // ADC A, reg8 
+        // ADC A, reg8
         case 0x88: adc8(BC.hi); break;         // ADC A, B
         case 0x89: adc8(BC.lo); break;         // ADC A, C
         case 0x8A: adc8(DE.hi); break;         // ADC A, D
@@ -247,7 +247,7 @@ void CPU::execute(u8 opcode) {
         case 0x8E: adc8(read(HL.pair)); break; // ADC A, (HL)
         case 0x8F: adc8(AF.hi); break;         // ADC A, A
         case 0xCE: adc8(n()); break;           // ADC A, n
-        // SUB A, reg8 
+        // SUB A, reg8
         case 0x90: sub8(BC.hi); break;         // SUB B
         case 0x91: sub8(BC.lo); break;         // SUB C
         case 0x92: sub8(DE.hi); break;         // SUB D
@@ -407,33 +407,33 @@ void CPU::execute(u8 opcode) {
         case 0xE9: PC = HL.pair; break; // JP HL
         // JR
         case 0x18: {
-            s8 off = n();
+            s8 off = (s8)n();
             PC += off;
             cycleCnt++;
         } break; // JR n
         case 0x20: {
-            s8 off = n();
+            s8 off = (s8)n();
             if (!check_flag(Z_FLAG)) {
                 PC += off;
                 cycleCnt++;
             }
         } break; // JR NZ, n
         case 0x30: {
-            s8 off = n();
+            s8 off = (s8)n();
             if (!check_flag(C_FLAG)) {
                 PC += off;
                 cycleCnt++;
             }
         } break; // JR NC, n
         case 0x28: {
-            s8 off = n();
+            s8 off = (s8)n();
             if (check_flag(Z_FLAG)) {
                 PC += off;
                 cycleCnt++;
             }
         } break; // JR Z, n
         case 0x38: {
-            s8 off = n();
+            s8 off = (s8)n();
             if (check_flag(C_FLAG)) {
                 PC += off;
                 cycleCnt++;
@@ -817,7 +817,7 @@ void CPU::add16(u16 val) {
 
 u16 CPU::addSP_n() {
     u16 stackPtr = SP;
-    s8 off = n();
+    s8 off = (s8)n();
     u16 res = stackPtr + off;
 
     set_flag(Z_FLAG, false);
@@ -922,7 +922,7 @@ void CPU::sla8(u8& reg) {
 
 void CPU::sra8(u8& reg) {
     set_flag(C_FLAG, reg & 0x1);
-    reg = (s8)reg >> 1;  // Arithmetic right shift
+    reg = (u8)((s8)reg >> 1);  // Arithmetic right shift
     set_flag(Z_FLAG, reg == 0);
     set_flag(N_FLAG, false);
     set_flag(H_FLAG, false);

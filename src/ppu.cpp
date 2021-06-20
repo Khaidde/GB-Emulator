@@ -19,18 +19,18 @@ void Fetcher::reset() {
     tileX = 0;
 }
 
-PPU::PPU(Memory* memory) : memory(memory) {
-    lcdc = &memory->ref(IOReg::LCDC_REG);
-    stat = &memory->ref(IOReg::STAT_REG);
-    scy = &memory->ref(IOReg::SCY_REG);
-    scx = &memory->ref(IOReg::SCX_REG);
-    ly = &memory->ref(IOReg::LY_REG);
-    lyc = &memory->ref(IOReg::LYC_REG);
-    wy = &memory->ref(IOReg::WY_REG);
-    wx = &memory->ref(IOReg::WX_REG);
+PPU::PPU(Memory& memory) : memory(&memory) {
+    lcdc = &memory.ref(IOReg::LCDC_REG);
+    stat = &memory.ref(IOReg::STAT_REG);
+    scy = &memory.ref(IOReg::SCY_REG);
+    scx = &memory.ref(IOReg::SCX_REG);
+    ly = &memory.ref(IOReg::LY_REG);
+    lyc = &memory.ref(IOReg::LYC_REG);
+    wy = &memory.ref(IOReg::WY_REG);
+    wx = &memory.ref(IOReg::WX_REG);
 
-    oamAddrBlock = &memory->ref(OAM_START_ADDR);
-    vramAddrBlock = &memory->ref(VRAM_START_ADDR);
+    oamAddrBlock = &memory.ref(OAM_START_ADDR);
+    vramAddrBlock = &memory.ref(VRAM_START_ADDR);
 }
 
 void PPU::restart() {
@@ -310,7 +310,8 @@ void PPU::try_trigger_stat() {
 }
 
 void PPU::handle_pixel_push() {
-    if (!fetcher.windowMode && get_lcdc_flag(LCDCFlag::WINDOW_ENABLE) && line >= *wy && curPixelX >= *wx - 7) {
+    if (!fetcher.windowMode && get_lcdc_flag(LCDCFlag::WINDOW_ENABLE) && line >= *wy &&
+        curPixelX >= *wx - 7) {
         fetcher.doFetch = false;
         fetcher.fetchState = Fetcher::READ_TILE_ID;
 
@@ -339,7 +340,8 @@ void PPU::handle_pixel_push() {
         }
     }
     if (!fetcher.curSprite) {
-        frameBuffers[bufferSel][line * Constants::WIDTH + curPixelX++] = get_color(pxlFifo.pop_head());
+        frameBuffers[bufferSel][line * Constants::WIDTH + curPixelX++] =
+            get_color(pxlFifo.pop_head());
     }
 }
 
@@ -356,13 +358,15 @@ void PPU::background_fetch() {
 
             u8 tileX = (xOff / TILE_PX_SIZE + fetcher.tileX) % TILESET_SIZE;
             u8 tileY = (yOff / TILE_PX_SIZE) % TILESET_SIZE;
-            s8 tileIndex = vramAddrBlock[(tileX + tileY * TILESET_SIZE) + tileMap - VRAM_START_ADDR];
+            s8 tileIndex =
+                (s8)vramAddrBlock[(tileX + tileY * TILESET_SIZE) + tileMap - VRAM_START_ADDR];
             u8 tileByteOff = (yOff % TILE_PX_SIZE) * 2;
 
             if (get_lcdc_flag(LCDCFlag::TILE_DATA_SELECT)) {
                 fetcher.tileRowAddrOff = (u8)tileIndex * TILE_MEM_LEN + tileByteOff;
             } else {
-                fetcher.tileRowAddrOff = VRAM_TILE_DATA_1 - VRAM_TILE_DATA_0 + tileIndex * TILE_MEM_LEN + tileByteOff;
+                fetcher.tileRowAddrOff = (u16)(VRAM_TILE_DATA_1 - VRAM_TILE_DATA_0 +
+                                               tileIndex * TILE_MEM_LEN + tileByteOff);
             }
             fetcher.fetchState = Fetcher::READ_TILE_0;
         } break;
@@ -394,8 +398,6 @@ void PPU::background_fetch() {
                 fetcher.tileX++;
                 fetcher.fetchState = Fetcher::READ_TILE_ID;
             }
-            break;
-        default:
             break;
     }
 }

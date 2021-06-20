@@ -155,7 +155,8 @@ void SquareChannel::emulate_clock() {
             clockCnt = clockLen;
             cycleIndex = (cycleIndex + 1) & 0x7;
 
-            outVol = enabled * dacEnabled * volumeEnvelope.get_volume() * DUTY_CYCLES[cycleIndex + dutyOff];
+            outVol = enabled * dacEnabled * volumeEnvelope.get_volume() *
+                     DUTY_CYCLES[cycleIndex + dutyOff];
         }
     }
 }
@@ -292,7 +293,9 @@ u8 NoiseChannel::get_left_vol() { return outVol * leftEnable; }
 
 u8 NoiseChannel::get_right_vol() { return outVol * rightEnable; }
 
-APU::APU(Memory* memory) : memory(memory) { wave.set_samples(&memory->ref(IOReg::WAVE_TABLE_START_REG)); }
+APU::APU(Memory& memory) : memory(&memory) {
+    wave.set_samples(&memory.ref(IOReg::WAVE_TABLE_START_REG));
+}
 
 void APU::restart() {
     memory->ref(IOReg::NR10_REG) = 0x80;
@@ -326,7 +329,8 @@ void APU::sample(s16* sampleBuffer, u16 sampleLen) {
     }
 }
 
-constexpr double CLOCKS_PER_SAMPLE = 70224.0 / (Constants::SAMPLE_RATE / (1000.0 / Constants::MS_PER_FRAME));
+constexpr double CLOCKS_PER_SAMPLE =
+    70224.0 / (Constants::SAMPLE_RATE / (1000.0 / Constants::MS_PER_FRAME));
 void APU::emulate_clock() {
     frameSequenceClocks++;
     if (frameSequenceClocks == 8192) {
@@ -361,14 +365,14 @@ void APU::emulate_clock() {
         mixedLeftVol += square2.get_left_vol();
         mixedLeftVol += wave.get_left_vol();
         mixedLeftVol += noise.get_left_vol();
-        sampleQueue.enqueue(Constants::MASTER_VOLUME * mixedLeftVol * leftVol);
+        sampleQueue.enqueue((s16)(Constants::MASTER_VOLUME * mixedLeftVol * leftVol));
 
         u16 mixedRightVol = 0;
         mixedRightVol += square1.get_right_vol();
         mixedRightVol += square2.get_right_vol();
         mixedRightVol += wave.get_right_vol();
         mixedRightVol += noise.get_right_vol();
-        sampleQueue.enqueue(Constants::MASTER_VOLUME * mixedRightVol * rightVol);
+        sampleQueue.enqueue((s16)(Constants::MASTER_VOLUME * mixedRightVol * rightVol));
     }
     downSampleCnt++;
 }
