@@ -1,11 +1,10 @@
 BUILD_TYPE ?= debug
 
-BIN_DIR := build/bin
-OBJ_DIR := build/obj
+BIN_DIR ?= build/bin
+OBJ_DIR ?= build/obj
 
-SDL2_INCLUDE := C:\SDL2\include
-SDL2_LIB := C:\SDL2\lib\x64
-
+SDL2_INCLUDE ?= C:\SDL2\include
+SDL2_LIB ?= C:\SDL2\lib\x64
 
 SOURCES := $(shell ls src/*.cpp)
 OBJECTS := $(patsubst src/%.cpp, $(OBJ_DIR)/%.o, $(SOURCES))
@@ -15,22 +14,23 @@ DEPS := $(patsubst src/%.cpp, $(OBJ_DIR)/%.d, $(SOURCES))
 EXEC := gbemu.exe
 
 PLATFORM := $(shell uname -s)
-ifneq ($(PLATFORM), windows32)
-${warning Build has not been test on ${PLATFORM}}
+ifneq ($(findstring MSYS,$(PLATFORM)),)
+PLATFORM := windows32
 endif
 
-ifeq ($(PLATFORM), windows32)
-MKDIR := $(shell which mkdir)
-RM := $(shell which rm)
-else
+ifneq ($(PLATFORM),windows32)
+${warn Build not test on ${PLATFORM}}
 MKDIR := mkdir
 RM := rm
+else
+MKDIR := $(shell which mkdir)
+RM := $(shell which rm)
 endif
 
 ifeq ($(shell which clang++),)
-$(error Could not find path to clang)
+$(error Could not find path to clang++)
 else
-CC := clang
+CC := clang++
 CFLAGS += -std=c++17 -Werror -Wpedantic -Wsign-conversion
 CFLAGS += -Wno-gnu-anonymous-struct -Wno-language-extension-token
 LDFLAGS := -lshell32 -lSDL2main -lSDL2
@@ -51,14 +51,14 @@ build: ${BIN_DIR}/${EXEC} ${BIN_DIR}/SDL2.dll
 
 ${BIN_DIR}/${EXEC}: ${OBJECTS}
 	@${MKDIR} -p ${dir $@} ||:
-	${CC} ${CFLAGS} -L${SDL2_LIB} ${LDFLAGS} -Wl,/subsystem:console $^ -o $@
+	${CC} ${CFLAGS} $^ -o $@ -L${SDL2_LIB} ${LDFLAGS} -Wl,--subsystem,console
 
 ${OBJ_DIR}/%.o: src/%.cpp
 	@${MKDIR} -p ${dir $@} ||:
-	${CC} ${CFLAGS} -I${SDL2_INCLUDE} -MMD -MF $(@:.o=.d) -c $< -o $@
+	${CC} ${CFLAGS} $< -o $@ -I${SDL2_INCLUDE} -MMD -MF $(@:.o=.d) -c
 
 ${BIN_DIR}/SDL2.dll:
 	cp ${SDL2_LIB}/SDL2.dll $@
 
 clean:
-	${RM} -f ${EXEC} ${OBJECTS} ${DEPS} ${BIN_DIR}/*
+	${RM} -f ${OBJECTS} ${DEPS} ${BIN_DIR}/*

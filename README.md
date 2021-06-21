@@ -5,11 +5,52 @@ A Gameboy/Gameboy Color emulator aimed at accuracy. This project is meant to be 
 # TODO
 
 -   OAM bug
--   ROM saving (traditional battery saving)
 -   Save States (emulator state save)
 -   MBC2, MBC3, MBC5
 -   Support CGB (Gameboy Color)
 -   Command-line parser
+
+# Build
+
+## Requirements (64-bit Windows)
+
+1. [SDL2 Visual C++ development libraries](https://www.libsdl.org/download-2.0.php)
+2. MSYS2 (GNU tools such as make)
+3. clang++
+
+## MSYS2 and Clang
+
+Install [MSYS2](https://www.msys2.org). Using pacman in the msys2 shell, download the base development tools and clang++ using the following command:
+
+```sh
+pacman -S --needed base-devel mingw-w64-x86_64-clang
+```
+
+## Compilation
+
+Clone the repository and change directories:
+
+```sh
+git clone https://github.com/Khaidde/GB-Emulator
+cd GB-Emulator
+```
+
+Run make in a msys2 mingw64 shell. Note that by default, the makefile uses "C:\SDL2\include" and "C:\SDL2\lib\x64" as the include and library path respectively. Flags can be provided to change these paths.
+
+```
+make SDL2_INCLUDE=C:/SDL2/include SDL2_LIB=C:/SDL2/lib/x64
+```
+
+Make targets:
+* ``build`` (compile emulator into a runnable executable)
+* ``clean`` (remove all files from the build directory)
+
+Other make variables include the following:
+* ``BUILD_TYPE`` ("debug" or "release")
+* ``BIN_DIR`` (output directory of the executable)
+* ``OBJ_DIR`` (output directory of the object files)
+
+Note: Build has only been tested on 64-bit Windows 10
 
 # ROM Tests
 
