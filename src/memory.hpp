@@ -36,6 +36,8 @@ public:
     void set_ppu(PPU& p) { this->ppu = &p; }
     void set_apu(APU& a) { this->apu = &a; }
 
+    bool is_CGB() { return cartridge->is_CGB(); }
+
     void request_interrupt(Interrupt interrupt);
 
     u8& ref(u16 addr);

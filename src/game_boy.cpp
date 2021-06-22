@@ -12,7 +12,8 @@ GameBoy::GameBoy() : input(memory), timer(memory), ppu(memory), apu(memory) {
 }
 
 namespace {
-constexpr int NUM_CART_TYPES = 4;
+constexpr int NUM_CART_TYPES = 7;
+// clang-format off
 constexpr struct {
     const u8 code;
     char mbc;
@@ -23,7 +24,11 @@ constexpr struct {
     {0x01, 1, false, false},
     {0x02, 1, true, false},
     {0x03, 1, true, true},
+    {0x19, 5, false, false},
+    {0x1A, 5, true, false},
+    {0x1B, 5, true, true},
 };
+//clang-format on
 }  // namespace
 
 void GameBoy::load(const char* romPath) {
@@ -38,13 +43,6 @@ void GameBoy::load(const char* romPath) {
     if (!file.is_open()) {
         fatal("Can't read from file: %s\n", romPath);
     }
-
-    /*
-    isCGB = FileManagement::is_path_extension(romPath, ".gbc");
-    if (isCGB) {
-        fatal("TODO gameboy color games are not yet supported!\n");
-    }
-    */
 
     std::streamsize romSize = file.tellg();
     std::vector<u8> rom((size_t)romSize);
@@ -61,21 +59,16 @@ void GameBoy::load(const char* romPath) {
                     break;
                 case 1:
                     cartridge = std::make_unique<MBC1>(romPath, &rom[0]);
+                    break;
+                case 5:
+                    cartridge = std::make_unique<MBC5>(romPath, &rom[0]);
+                    break;
             }
             cartridge->set_has_ram(CART_TYPES[i].hasRam);
             cartridge->set_has_battery(CART_TYPES[i].hasBattery);
             if (CART_TYPES[i].hasBattery) {
-                std::string savePath = FileManagement::change_extension(romPath, ".sav");
-                std::ifstream saveFile(savePath, std::ios::binary | std::ios::ate);
-                if (saveFile.is_open()) {
-                    printf("Loading save file: %s\n", savePath.c_str());
-                    std::streamsize ramSize = saveFile.tellg();
-                    std::vector<u8> ram((size_t)ramSize);
-                    saveFile.seekg(0);
-                    saveFile.read((char*)&ram[0], ramSize);
-                    saveFile.close();
-                    cartridge->load_save_ram(&ram[0]);
-                }
+                cartridge->load_save_file(
+                    FileManagement::change_extension(romPath, ".sav").c_str());
             }
         }
     }

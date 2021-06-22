@@ -11,6 +11,10 @@ using u32 = uint32_t;
 using s8 = int8_t;
 using s16 = int16_t;
 
+#ifndef VERBOSE_LOG
+#define VERBOSE_LOG false
+#endif
+
 #define fatal(...)                                                                     \
     char buff[0xFF] = "FATAL ERROR: ";                                                 \
     snprintf(buff + 13 * sizeof(char), sizeof(buff) - 13 * sizeof(char), __VA_ARGS__); \

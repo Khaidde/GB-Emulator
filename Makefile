@@ -43,21 +43,36 @@ ifeq (${BUILD_TYPE}, release)
 CFLAGS += -O3
 endif
 
-TESTER_DIR := tester/build
+TESTER_DIR := tester
+TESTER_BIN_DIR := ${TESTER_DIR}/build/bin
+TESTER_OBJ_DIR := ${TESTER_DIR}/build/obj
 
-all: build
+all: build test
 
 build: ${BIN_DIR}/${EXEC} ${BIN_DIR}/SDL2.dll
 
 ${BIN_DIR}/${EXEC}: ${OBJECTS}
-	@${MKDIR} -p ${dir $@} ||:
+	@${MKDIR} -p ${dir $@}
 	${CC} ${CFLAGS} $^ -o $@ -L${SDL2_LIB} ${LDFLAGS} -Wl,--subsystem,console
 
 ${OBJ_DIR}/%.o: src/%.cpp
-	@${MKDIR} -p ${dir $@} ||:
+	@${MKDIR} -p ${dir $@}
 	${CC} ${CFLAGS} $< -o $@ -I${SDL2_INCLUDE} -MMD -MF $(@:.o=.d) -c
 
 ${BIN_DIR}/SDL2.dll:
+	cp ${SDL2_LIB}/SDL2.dll $@
+
+test: ${TESTER_BIN_DIR}/gbemu-tester.exe ${TESTER_BIN_DIR}/SDL2.dll
+
+${TESTER_BIN_DIR}/gbemu-tester.exe: ${TESTER_OBJ_DIR}/tester.o ${OBJECTS}
+	@${MKDIR} -p ${dir $@}
+	${CC} ${CFLAGS} $^ -o $@ -L${SDL2_LIB} ${LDFLAGS} -Wl,--subsystem,console
+
+${TESTER_OBJ_DIR}/tester.o: ${TESTER_DIR}/tester.cpp
+	@${MKDIR} -p ${dir $@}
+	${CC} ${CFLAGS} $< -o $@ -I${SDL2_INCLUDE} -c
+
+${TESTER_BIN_DIR}/SDL2.dll:
 	cp ${SDL2_LIB}/SDL2.dll $@
 
 clean:

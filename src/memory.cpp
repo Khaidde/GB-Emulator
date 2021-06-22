@@ -36,11 +36,17 @@ void Memory::request_interrupt(Interrupt interrupt) {
 u8& Memory::ref(u16 addr) { return mem[addr]; }
 
 u8 Memory::read(u16 addr) {
-    if (addr < 0x8000 || (0xA000 <= addr && addr < 0xC000)) {
-        return cartridge->read(addr);
+    if (addr < 0x8000) {
+        return cartridge->read_rom(addr);
     }
-    if (ppu->is_vram_blocked() && 0x8000 <= addr && addr < 0xA000) {
-        return 0xFF;
+    if (addr < 0xA000) {
+        if (ppu->is_vram_blocked()) {
+            return 0xFF;
+        }
+        return mem[addr];
+    }
+    if (addr < 0xC000) {
+        return cartridge->read_ram(addr);
     }
     if (0xFE00 <= addr && addr < 0xFF00) {
         if (dmaInProgress) {

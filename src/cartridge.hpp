@@ -1,17 +1,21 @@
 #pragma once
 
-#include <vector>
-
 #include "general.hpp"
 
 class Cartridge {
 public:
-    Cartridge(const char* cartName, const char* filePath, u8* rom);
-    virtual ~Cartridge() = default;
-    virtual void load_save_ram(u8* ram){};
-    void save_to_file(std::vector<u8>& ram);
-    virtual u8 read(u16 addr) = 0;
+    Cartridge(const char* cartName, size_t maxRomBanks, size_t maxRamBanks, const char* filePath,
+              u8* rom);
+    virtual ~Cartridge();
+
+    void load_save_file(const char* savePath);
+
     virtual void write(u16 addr, u8 val) = 0;
+
+    u8 read_rom(u16 addr);
+    u8 read_ram(u16 addr);
+
+    bool is_CGB() { return isCGB; }
 
     void set_has_ram(bool cartHasRam) { this->hasRam = cartHasRam; }
     void set_has_battery(bool cartHasBattery) { this->hasBattery = cartHasBattery; }
@@ -23,6 +27,8 @@ private:
     u8 read_header(u16 addr);
 
 protected:
+    bool isCGB;
+
     const char* cartridgeName;
     const char* filePath;
 
@@ -35,65 +41,56 @@ protected:
     bool hasTimer = false;   // TODO unimplemented
     bool hasRumble = false;  // TODO unimplemented
 
+    static constexpr u16 ROM_BANK_SIZE = 0x4000;
+    static constexpr u16 RAM_BANK_SIZE = 0x2000;
+    static constexpr u16 EXTERNAL_RAM_ADDR = 0xA000;
+
+    using RomBank = u8[ROM_BANK_SIZE];
+    using RamBank = u8[RAM_BANK_SIZE];
+
     u8 romType;
     u8 ramType;
-    u16 numRomBanks;
-    u16 numRamBanks;
+    size_t numRomBanks;
+    size_t numRamBanks;
+    const size_t MAX_ROM_BANKS;
+    const size_t MAX_RAM_BANKS;
+
+    RomBank* romBanks;
+    RamBank* ramBanks;
+
+    RomBank* zeroBank;
+    RomBank* highBank;
+
+    RamBank* activeRamBank;
+    bool ramg;  // RAMG - ram gate register, enable or disable ram
 };
 
 class ROMOnly : public Cartridge {
 public:
     ROMOnly(const char* filePath, u8* rom);
-    u8 read(u16 addr) override;
     void write(u16 addr, u8 val) override;
-
-private:
-    static constexpr u16 ROM_SIZE = 0x8000;
-    u8 rom[ROM_SIZE];
 };
 
 class MBC1 : public Cartridge {
 public:
     MBC1(const char* filePath, u8* rom);
-    ~MBC1() override;
-    void load_save_ram(u8* ram) override;
-    u8 read(u16 addr) override;
     void write(u16 addr, u8 val) override;
+
+private:
     void update_banks();
 
 private:
-    static constexpr u16 ROM_BANK_SIZE = 0x4000;
-    using RomBank = u8[ROM_BANK_SIZE];
-    static constexpr u8 MAX_ROM_BANKS = 128;
-    RomBank* romBanks;
-
-    RomBank* zeroBank;
-
-    u8 bank1Num;  // BANK1 register for 0x4000 -0x7FFF access
-    RomBank* highBank;
-
-    u8 bank2Num;  // BANK2 register for upper bit of ROM bank number or 2-bit RAM bank number
-
-    static constexpr u16 EXTERNAL_RAM_ADDR = 0xA000;
-    static constexpr u16 RAM_BANK_SIZE = 0x2000;
-    using RamBank = u8[RAM_BANK_SIZE];
-    static constexpr u8 MAX_RAM_BANKS = 4;
-    RamBank* ramBanks;
-
-    RamBank* activeRamBank;
-
-    bool ramg;  // RAMG - ram gate register, enable or disable ram
-    bool mode;
+    u8 bank1Num = 1;  // BANK1 register for 0x4000-0x7FFF access
+    u8 bank2Num = 0;  // BANK2 register for upper bit of ROM bank number or 2-bit RAM bank number
+    bool mode = false;
 };
 
 class MBC5 : public Cartridge {
 public:
     MBC5(const char* filePath, u8* rom);
-    ~MBC5() override;
-    u8 read(u16 addr) override;
     void write(u16 addr, u8 val) override;
-    void update_banks();
 
 private:
-    static constexpr u8 MAX_ROM_BANKS = 128;
+    u8 romb0 = 1;  // lower 8-bits of bank for 0x4000-0x7FFF access
+    u8 romb1 = 0;  // upper 9th bit of bank for 0x4000-0x7FFF access
 };

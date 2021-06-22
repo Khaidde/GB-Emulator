@@ -73,7 +73,7 @@ void CPU::emulate_cycle() {
 
     if (--cycleCnt == 0) {
         // PAUSE_EXEC_OCC(this, debugger, 0x48, 1);
-        // PAUSE_EXEC(this, debugger, 0x2c3);
+        // PAUSE_EXEC(this, debugger, 0x101);
     }
 
     if (callbackCycle > 0) {

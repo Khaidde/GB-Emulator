@@ -1,6 +1,4 @@
-build/
-cmake-build-debug/
-.*/
-
-roms/
-tester/
+build
+roms
+cmake-build-debug
+.*

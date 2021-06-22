@@ -5,8 +5,7 @@ A Gameboy/Gameboy Color emulator aimed at accuracy. This project is meant to be 
 # TODO
 
 -   OAM bug
--   Save States (emulator state save)
--   MBC2, MBC3, MBC5
+-   MBC2, MBC3
 -   Support CGB (Gameboy Color)
 -   Command-line parser
 
@@ -16,6 +15,7 @@ A Gameboy/Gameboy Color emulator aimed at accuracy. This project is meant to be 
 
 1. [SDL2 Visual C++ development libraries](https://www.libsdl.org/download-2.0.php)
 2. MSYS2 (GNU tools such as make)
+
 3. clang++
 
 ## MSYS2 and Clang
@@ -90,11 +90,11 @@ Note: Build has only been tested on 64-bit Windows 10
 
 ### oam_dma
 
-| Test       | Passed | Note       |
-| ---------- | :----: | ---------- |
-| basic      |   x    |            |
-| reg_read   |   x    |            |
-| sources-GS |        | MBC5 unimp |
+| Test       | Passed | Note           |
+| ---------- | :----: | -------------- |
+| basic      |   x    |                |
+| reg_read   |   x    |                |
+| sources-GS |        | unhandled case |
 
 ### ppu
 
@@ -119,7 +119,7 @@ Note: Build has only been tested on 64-bit Windows 10
 | ----------------------- | :----: | ---- |
 | add_sp_e_timing         |   x    |      |
 | boot_div-dmgABCmgb      |   x    |      |
-| boot_hwio-dmgABCmgb     |   x    |      |
+| boot_hwio-dmgABCmgb     |        |      |
 | boot_regs-dmgABC        |   x    |      |
 | call_cc_timing          |   x    |      |
 | call_cc_timing2         |   x    |      |
@@ -166,6 +166,20 @@ Note: Build has only been tested on 64-bit Windows 10
 | rom_4Mb           |   x    |             |
 | rom_8Mb           |   x    |             |
 | rom_16Mb          |   x    |             |
+
+
+### mbc5
+
+| Test              | Passed | Note        |
+| ----------------- | :----: | ----------- |
+| rom_512kb         |   x    |             |
+| rom_1Mb           |   x    |             |
+| rom_2Mb           |   x    |             |
+| rom_4Mb           |   x    |             |
+| rom_8Mb           |   x    |             |
+| rom_16Mb          |   x    |             |
+| rom_32Mb          |   x    |             |
+| rom_64Mb          |   x    |             |
 
 ### manual-only
 

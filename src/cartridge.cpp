@@ -2,16 +2,18 @@
 
 #include <fstream>
 #include <string>
+#include <vector>
 
 namespace {
+// clang-format off
 constexpr const char* ROM_SIZES[] = {
     "32 KByte (no ROM banking)",
     "64 KByte (4 banks)",
     "128 KByte (8 banks)",
     "256 KByte (16 banks)",
     "512 KByte (32 banks)",
-    "1 MByte (64 banks or 63 on MBC1)",
-    "2 MByte (128 banks or 127 on MBC1)",
+    "1 MByte (64 banks)",
+    "2 MByte (128 banks)",
     "4 MByte (256 banks)",
     "8 MByte (512 banks)",
 };
@@ -26,10 +28,20 @@ constexpr struct {
     {"128 KBytes (16 banks of 8KBytes)", 16},
     {"64 KBytes (8 banks of 8KBytes)", 8},
 };
+// clang-format on
 }  // namespace
 
-Cartridge::Cartridge(const char* cartName, const char* filePath, u8* rom)
-    : cartridgeName(cartName), filePath(filePath) {
+Cartridge::Cartridge(const char* cartName, size_t maxRomBanks, size_t maxRamBanks,
+                     const char* filePath, u8* rom)
+    : cartridgeName(cartName),
+      MAX_ROM_BANKS(maxRomBanks),
+      MAX_RAM_BANKS(maxRamBanks),
+      filePath(filePath) {
+    isCGB = FileManagement::is_path_extension(filePath, ".gbc");
+    if (isCGB) {
+        fatal("TODO gameboy color games are not yet supported!\n");
+    }
+
     for (int i = 0; i < HEADER_SIZE; i++) {
         header[i] = rom[HEADER_START + i];
     }
@@ -45,6 +57,17 @@ Cartridge::Cartridge(const char* cartName, const char* filePath, u8* rom)
     } else {
         fatal("Unknown rom size: %d\n", romType);
     }
+    if (numRomBanks > MAX_ROM_BANKS) {
+        fatal("Incompatible number of rom banks for %s: %d\n", cartName, numRomBanks);
+    }
+    this->romBanks = new RomBank[numRomBanks];
+    for (int i = 0; i < numRomBanks; i++) {
+        for (int k = 0; k < ROM_BANK_SIZE; k++) {
+            romBanks[i][k] = rom[i * ROM_BANK_SIZE + k];
+        }
+    }
+    this->zeroBank = &romBanks[0];
+    this->highBank = &romBanks[1];
 
     ramType = rom[0x149];
     if (ramType <= 0x5) {
@@ -55,15 +78,54 @@ Cartridge::Cartridge(const char* cartName, const char* filePath, u8* rom)
     } else {
         fatal("Unknown ram size: %d\n", ramType);
     }
+    if (numRamBanks > 0) {
+        this->ramBanks = new RamBank[numRamBanks];
+        this->activeRamBank = &ramBanks[0];
+
+        this->ramg = false;
+    }
 }
 
-void Cartridge::save_to_file(std::vector<u8>& ram) {
-    std::string savePath = FileManagement::change_extension(filePath, ".sav");
-    printf("Saving game to file: %s\n", savePath.c_str());
+Cartridge::~Cartridge() {
+    if (hasBattery) {
+        std::vector<u8> ram;
+        ram.reserve(numRamBanks * RAM_BANK_SIZE);
+        for (int i = 0; i < numRamBanks; i++) {
+            ram.insert(ram.begin() + (i * RAM_BANK_SIZE), std::begin(ramBanks[i]),
+                       std::end(ramBanks[i]));
+        }
 
-    std::ofstream saveFileStream(savePath, std::ios::binary);
-    saveFileStream.write((char*)(&ram[0]), (std::streamsize)ram.size());
-    saveFileStream.close();
+        std::string savePath = FileManagement::change_extension(filePath, ".sav");
+        printf("Saving game to file: %s\n", savePath.c_str());
+
+        std::ofstream saveFileStream(savePath, std::ios::binary);
+        saveFileStream.write((char*)ram.data(), (std::streamsize)ram.size());
+        saveFileStream.close();
+    }
+    delete[] romBanks;
+    if (hasRam) {
+        delete[] ramBanks;
+    }
+}
+
+void Cartridge::load_save_file(const char* savePath) {
+    std::ifstream saveFile(savePath, std::ios::binary | std::ios::ate);
+    if (saveFile.is_open()) {
+        printf("Loading save file: %s\n", savePath);
+        std::streamsize ramSize = saveFile.tellg();
+
+        std::vector<u8> ram;
+        ram.reserve((size_t)ramSize);
+        saveFile.seekg(0);
+        saveFile.read((char*)ram.data(), ramSize);
+        saveFile.close();
+
+        for (size_t i = 0; i < numRamBanks; i++) {
+            for (size_t k = 0; k < RAM_BANK_SIZE; k++) {
+                this->ramBanks[i][k] = ram[i * RAM_BANK_SIZE + k];
+            }
+        }
+    }
 }
 
 void Cartridge::print_cartridge_info() {
@@ -80,11 +142,19 @@ void Cartridge::print_cartridge_info() {
         printf("CGB Flag: also works on old gameboys\n");
     } else if (read_header(0x143) == 0xC0) {
         printf("CGB Flag: only works on CGB\n");
-    } else {
-        printf("CGB Flag: %02x\n", read_header(0x143));
     }
 
-    printf("ROM Size: %s\n", ROM_SIZES[romType]);
+    if (cartridgeName[3] == '1') {
+        if (romType == 5) {
+            printf("ROM Size: 1 Mbyte (63 banks on MBC1)\n");
+        } else if (romType == 6) {
+            printf("ROM Size: 2 Mbyte (127 banks on MBC1)\n");
+        } else {
+            printf("ROM Size: %s\n", ROM_SIZES[romType]);
+        }
+    } else {
+        printf("ROM Size: %s\n", ROM_SIZES[romType]);
+    }
     printf("RAM Size: %s\n", RAM_SIZES[ramType].desc);
 
     if (read_header(0x146) == 0x00) {
@@ -112,87 +182,39 @@ void Cartridge::print_cartridge_info() {
 
 u8 Cartridge::read_header(u16 addr) { return header[addr - HEADER_START]; }
 
-ROMOnly::ROMOnly(const char* filePath, u8* rom) : Cartridge("ROM Only", filePath, rom) {
-    for (int i = 0; i < ROM_SIZE; i++) {
-        this->rom[i] = rom[i];
+u8 Cartridge::read_rom(u16 addr) {
+    if (addr < ROM_BANK_SIZE) {
+        return (*zeroBank)[addr];
     }
+    if (addr < ROM_BANK_SIZE * 2) {
+        return (*highBank)[addr & 0x3FFF];
+    }
+    fatal("Invalid rom address: %04x\n", addr);
 }
 
-u8 ROMOnly::read(u16 addr) {
-    if (addr > 0x8000) {
-        printf("Warning: Rom only cartridge has no external ram.\n");
+u8 Cartridge::read_ram(u16 addr) {
+    if (EXTERNAL_RAM_ADDR > addr || addr >= EXTERNAL_RAM_ADDR + RAM_BANK_SIZE) {
+        fatal("Invalid ram address read: %04x\n", addr);
     }
-    return rom[addr];
+    if (ramg) {
+        return (*activeRamBank)[addr - EXTERNAL_RAM_ADDR];
+    }
+    return 0xFF;
 }
+
+ROMOnly::ROMOnly(const char* filePath, u8* rom) : Cartridge("ROM Only", 2, 0, filePath, rom) {}
 
 void ROMOnly::write(u16 addr, u8 val) {
     printf("Warning: Attempting to write to rom only cartridge, addr=%02x val=%02x.\n", addr, val);
 }
 
-MBC1::MBC1(const char* filePath, u8* rom) : Cartridge("MBC1", filePath, rom) {
-    if (numRomBanks > MAX_ROM_BANKS) {
-        printf("Incompatible number of rom banks for MBC1: %d\n", numRomBanks);
-        return;
-    }
-
-    this->romBanks = new RomBank[numRomBanks];
-    for (int i = 0; i < numRomBanks; i++) {
-        for (int k = 0; k < ROM_BANK_SIZE; k++) {
-            romBanks[i][k] = rom[i * ROM_BANK_SIZE + k];
-        }
-    }
-
-    this->zeroBank = &romBanks[0];
-
-    this->bank1Num = 1;
-    this->highBank = &romBanks[bank1Num];
-
-    this->ramBanks = new RamBank[numRamBanks];
-    this->bank2Num = 0;
-    this->activeRamBank = &ramBanks[0];
-
-    this->ramg = false;
-    this->mode = false;
-}
-
-MBC1::~MBC1() {
-    if (hasBattery) {
-        std::vector<u8> ram;
-        ram.reserve(numRamBanks * RAM_BANK_SIZE);
-        for (int i = 0; i < numRamBanks; i++) {
-            ram.insert(ram.begin() + (i * RAM_BANK_SIZE), std::begin(ramBanks[i]),
-                       std::end(ramBanks[i]));
-        }
-        save_to_file(ram);
-    }
-    delete[] romBanks;
-    delete[] ramBanks;
-}
-
-void MBC1::load_save_ram(u8* ram) {
-    for (int i = 0; i < numRamBanks; i++) {
-        for (int k = 0; k < RAM_BANK_SIZE; k++) {
-            this->ramBanks[i][k] = ram[i * RAM_BANK_SIZE + k];
-        }
-    }
-}
-
-u8 MBC1::read(u16 addr) {
-    if (addr < ROM_BANK_SIZE) {
-        return (*zeroBank)[addr];
-    } else if (addr < ROM_BANK_SIZE * 2) {
-        return (*highBank)[addr & (0x4000 - 1)];
-    } else if (ramg && hasRam) {
-        return (*activeRamBank)[addr - EXTERNAL_RAM_ADDR];
-    } else if (EXTERNAL_RAM_ADDR > addr || addr >= EXTERNAL_RAM_ADDR + RAM_BANK_SIZE) {
-        fatal("Invalid MBC1 address read: %02x\n", addr);
-    }
-    return 0xFF;
-}
+MBC1::MBC1(const char* filePath, u8* rom) : Cartridge("MBC1", 128, 4, filePath, rom) {}
 
 void MBC1::write(u16 addr, u8 val) {
     if (addr < 0x2000) {
-        ramg = (val & 0xF) == 0xA;
+        if (hasRam) {
+            ramg = (val & 0xF) == 0xA;
+        }
     } else if (addr < 0x4000) {
         bank1Num = val & (0x20 - 1);
         if (bank1Num == 0) bank1Num = 1;
@@ -242,12 +264,24 @@ void MBC1::update_banks() {
     }
 }
 
-MBC5::MBC5(const char* filePath, u8* rom) : Cartridge("MBC5", filePath, rom) {}
+MBC5::MBC5(const char* filePath, u8* rom) : Cartridge("MBC5", 512, 16, filePath, rom) {}
 
-MBC5::~MBC5() {}
-
-u8 MBC5::read(u16) { return 0; }
-
-void MBC5::write(u16, u8) {}
-
-void MBC5::update_banks() {}
+void MBC5::write(u16 addr, u8 val) {
+    if (addr < 0x2000) {
+        if (hasRam) {
+            ramg = val == 0xA;
+        }
+    } else if (addr < 0x3000) {
+        romb0 = val;
+        highBank = &romBanks[(size_t)((romb1 << 8) | romb0) & (numRomBanks - 1)];
+    } else if (addr < 0x4000) {
+        romb1 = val & 0x1;
+        highBank = &romBanks[(size_t)((romb1 << 8) | romb0) & (numRomBanks - 1)];
+    } else if (addr < 0x6000) {
+        activeRamBank = &ramBanks[val & 0xF];
+    } else if (EXTERNAL_RAM_ADDR > addr || addr >= EXTERNAL_RAM_ADDR + RAM_BANK_SIZE) {
+        fatal("Invalid MBC5 address write: %02x\n", addr);
+    } else if (ramg) {
+        (*activeRamBank)[addr - EXTERNAL_RAM_ADDR] = val;
+    }
+}
