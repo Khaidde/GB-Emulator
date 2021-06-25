@@ -7,7 +7,7 @@
 namespace {
 
 struct Screen {
-    static constexpr int PIXEL_SCALE = 4;
+    static constexpr int PIXEL_SCALE = 5;
 
     SDL_Window* window;
     SDL_Renderer* renderer;

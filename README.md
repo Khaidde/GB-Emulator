@@ -5,7 +5,7 @@ A Gameboy/Gameboy Color emulator aimed at accuracy. This project is meant to be 
 # TODO
 
 -   OAM bug
--   MBC2, MBC3
+-   MBC3
 -   Support CGB (Gameboy Color)
 -   Command-line parser
 
@@ -43,6 +43,7 @@ make SDL2_INCLUDE=C:/SDL2/include SDL2_LIB=C:/SDL2/lib/x64
 
 Make targets:
 * ``build`` (compile emulator into a runnable executable)
+* ``test`` (compile emulator with tester options to run test suite)
 * ``clean`` (remove all files from the build directory)
 
 Other make variables include the following:
@@ -167,19 +168,31 @@ Note: Build has only been tested on 64-bit Windows 10
 | rom_8Mb           |   x    |             |
 | rom_16Mb          |   x    |             |
 
+### mbc2
+
+| Test        | Passed | Note        |
+| ----------- | :----: | ----------- |
+| bits_ramg   |   x    |             |
+| bits_romb   |   x    |             |
+| bits_unused |   x    |             |
+| ram         |   x    |             |
+| rom_512kb   |   x    |             |
+| rom_1Mb     |   x    |             |
+| rom_2Mb     |   x    |             |
+
 
 ### mbc5
 
-| Test              | Passed | Note        |
-| ----------------- | :----: | ----------- |
-| rom_512kb         |   x    |             |
-| rom_1Mb           |   x    |             |
-| rom_2Mb           |   x    |             |
-| rom_4Mb           |   x    |             |
-| rom_8Mb           |   x    |             |
-| rom_16Mb          |   x    |             |
-| rom_32Mb          |   x    |             |
-| rom_64Mb          |   x    |             |
+| Test      | Passed | Note        |
+| --------- | :----: | ----------- |
+| rom_512kb |   x    |             |
+| rom_1Mb   |   x    |             |
+| rom_2Mb   |   x    |             |
+| rom_4Mb   |   x    |             |
+| rom_8Mb   |   x    |             |
+| rom_16Mb  |   x    |             |
+| rom_32Mb  |   x    |             |
+| rom_64Mb  |   x    |             |
 
 ### manual-only
 

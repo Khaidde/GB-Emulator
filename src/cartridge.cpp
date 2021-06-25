@@ -31,22 +31,17 @@ constexpr struct {
 // clang-format on
 }  // namespace
 
-Cartridge::Cartridge(CartridgeInfo& info, const char* cartName, size_t maxRomBanks,
-                     size_t maxRamBanks, u8* rom)
+Cartridge::Cartridge(CartridgeInfo& info, const char* cartName, int maxRomBanks, int maxRamBanks,
+                     u8* rom)
     : info(info) {
-    if (info.isCGB) {
-        fatal("TODO gameboy color games are not yet supported!\n");
-    }
-
 #if PLAYABLE
-    u8 title[15];
+    u8 title[16];
     int t = 0;
-    for (int c = 0x134; c < 0x143; c++) {
-        title[t++] = rom[c];
-    }
-    printf("Title: %s\n", title);
-
     if (info.isCGB) {
+        for (int c = 0x134; c < 0x143; c++) {
+            title[t++] = rom[c];
+        }
+
         // 80h - Game supports CGB functions, but works on old gameboys also.
         // C0h - Game works on CGB only (physically the same as 80h).
         if (rom[0x143] == 0x80) {
@@ -54,14 +49,21 @@ Cartridge::Cartridge(CartridgeInfo& info, const char* cartName, size_t maxRomBan
         } else if (rom[0x143] == 0xC0) {
             printf("CGB Flag: only works on CGB\n");
         }
+    } else {
+        for (int c = 0x134; c < 0x144; c++) {
+            title[t++] = rom[c];
+        }
+    }
+    printf("Title: %s\n", title);
+
+    if (rom[0x146] == 0x03) {
+        printf("Game supports SGB functions\n");
     }
 #endif
+
     u8 romType = rom[0x148];
-    numRomBanks = 2;
     if (romType <= 0x8) {
-        for (int i = 0; i < romType; i++) {
-            numRomBanks *= 2;
-        }
+        numRomBanks = (size_t)(2 << romType);
     } else if (0x52 <= romType && romType <= 0x54) {
         fatal("Unsupported rom size: %d\n", romType);
     } else {
@@ -95,7 +97,6 @@ Cartridge::Cartridge(CartridgeInfo& info, const char* cartName, size_t maxRomBan
         this->ramBanks = new RamBank[numRamBanks];
         this->activeRamBank = &ramBanks[0];
     }
-    this->ramg = false;
 
 #if PLAYABLE
     if (cartName[3] == '1') {
@@ -110,12 +111,6 @@ Cartridge::Cartridge(CartridgeInfo& info, const char* cartName, size_t maxRomBan
         printf("ROM Size: %s\n", ROM_SIZES[romType]);
     }
     printf("RAM Size: %s\n", RAM_SIZES[ramType].desc);
-
-    if (rom[0x146] == 0x00) {
-        printf("No SGB functions\n");
-    } else if (rom[0x146] == 0x03) {
-        printf("Game supports SGB functions\n");
-    }
 
     std::string cartridgeType(cartName);
     if (info.hasRam) cartridgeType += " + ram";
@@ -256,6 +251,41 @@ void MBC1::update_banks() {
     } else {
         activeRamBank = &ramBanks[bank2Num];
     }
+}
+
+MBC2::MBC2(CartridgeInfo& info, u8* rom) : Cartridge(info, "MBC2", 16, 0, rom) {
+    this->info.hasRam = true;
+    this->ramBanks = new RamBank[1];
+}
+
+void MBC2::write(u16 addr, u8 val) {
+    if (addr < 0x4000) {
+        if (addr & 0x100) {
+            if ((val & 0xF) == 0) {
+                highBank = &romBanks[1];
+            } else {
+                highBank = &romBanks[(val & 0xF) & (numRomBanks - 1)];
+            }
+        } else if (info.hasRam) {
+            ramg = (val & 0xF) == 0xA;
+        }
+    } else if (addr < 0x8000) {
+        return;
+    } else if (EXTERNAL_RAM_ADDR > addr || addr >= EXTERNAL_RAM_ADDR + RAM_BANK_SIZE) {
+        fatal("Invalid MBC2 address write: %02x\n", addr);
+    } else if (ramg) {
+        ramBanks[0][(addr - EXTERNAL_RAM_ADDR) & 0x1FF] = val | 0xF0;
+    }
+}
+
+u8 MBC2::read_ram(u16 addr) {
+    if (EXTERNAL_RAM_ADDR > addr || addr >= EXTERNAL_RAM_ADDR + RAM_BANK_SIZE) {
+        fatal("Invalid ram address read: %04x\n", addr);
+    }
+    if (ramg) {
+        return ramBanks[0][(addr - EXTERNAL_RAM_ADDR) & 0x1FF];
+    }
+    return 0xFF;
 }
 
 MBC5::MBC5(CartridgeInfo& info, u8* rom) : Cartridge(info, "MBC5", 512, 16, rom) {}

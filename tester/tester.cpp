@@ -84,7 +84,7 @@ int main(int argc, char** argv) {
             };
             const std::vector<std::string> excludeList = {
                 "oam_dma",
-                "mbc2",
+                "multicart_rom_8Mb.gb",
             };
 
             for (const auto& path : testRomPaths) {

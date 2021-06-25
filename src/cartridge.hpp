@@ -14,8 +14,7 @@ struct CartridgeInfo {
 
 class Cartridge {
 public:
-    Cartridge(CartridgeInfo& info, const char* cartName, size_t maxRomBanks, size_t maxRamBanks,
-              u8* rom);
+    Cartridge(CartridgeInfo& info, const char* cartName, int maxRomBanks, int maxRamBanks, u8* rom);
     virtual ~Cartridge();
 
     void try_load_save_file();
@@ -23,7 +22,7 @@ public:
     virtual void write(u16 addr, u8 val) = 0;
 
     u8 read_rom(u16 addr);
-    u8 read_ram(u16 addr);
+    virtual u8 read_ram(u16 addr);
 
     bool is_CGB() { return info.isCGB; }
 
@@ -47,7 +46,7 @@ protected:
     RomBank* highBank;
 
     RamBank* activeRamBank;
-    bool ramg;  // RAMG - ram gate register, enable or disable ram
+    bool ramg = false;  // RAMG - ram gate register, enable or disable ram
 };
 
 class ROMOnly : public Cartridge {
@@ -68,6 +67,13 @@ private:
     u8 bank1Num = 1;  // BANK1 register for 0x4000-0x7FFF access
     u8 bank2Num = 0;  // BANK2 register for upper bit of ROM bank number or 2-bit RAM bank number
     bool mode = false;
+};
+
+class MBC2 : public Cartridge {
+public:
+    MBC2(CartridgeInfo& info, u8* rom);
+    void write(u16 addr, u8 val) override;
+    u8 read_ram(u16 addr) override;
 };
 
 class MBC5 : public Cartridge {

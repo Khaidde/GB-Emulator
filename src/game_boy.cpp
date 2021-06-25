@@ -12,7 +12,7 @@ GameBoy::GameBoy() : input(memory), timer(memory), ppu(memory), apu(memory) {
 }
 
 namespace {
-constexpr int NUM_CART_TYPES = 7;
+constexpr int NUM_CART_TYPES = 9;
 // clang-format off
 constexpr struct {
     const u8 code;
@@ -24,6 +24,8 @@ constexpr struct {
     {0x01, 1, false, false},
     {0x02, 1, true, false},
     {0x03, 1, true, true},
+    {0x05, 2, false, false},
+    {0x06, 2, false, true},
     {0x19, 5, false, false},
     {0x1A, 5, true, false},
     {0x1B, 5, true, true},
@@ -65,6 +67,9 @@ void GameBoy::load(const char* romPath) {
                     break;
                 case 1:
                     cartridge = std::make_unique<MBC1>(info, &rom[0]);
+                    break;
+                case 2:
+                    cartridge = std::make_unique<MBC2>(info, &rom[0]);
                     break;
                 case 5:
                     cartridge = std::make_unique<MBC5>(info, &rom[0]);
