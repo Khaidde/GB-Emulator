@@ -124,7 +124,11 @@ void CPU::execute(u8 opcode) {
         case 0x2A: AF.hi = read(HL.pair++); break; // LD A, (HL+)
         case 0x3A: AF.hi = read(HL.pair--); break; // LD A, (HL-)
         // LD B, r2
-        case 0x40: break;                        // LD B, B
+        case 0x40:
+            #if !PLAYABLE
+            debugger->pause_exec();
+            #endif
+            break; // LD B, B
         case 0x41: BC.hi = BC.lo; break;         // LD B, C
         case 0x42: BC.hi = DE.hi; break;         // LD B, D
         case 0x43: BC.hi = DE.lo; break;         // LD B, E

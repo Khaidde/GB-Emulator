@@ -3,8 +3,8 @@ BUILD_TYPE ?= debug
 BIN_DIR ?= build/bin
 OBJ_DIR ?= build/obj
 
-SDL2_INCLUDE ?= C:\SDL2\include
-SDL2_LIB ?= C:\SDL2\lib\x64
+SDL2_INCLUDE ?= C:/SDL2/include
+SDL2_LIB ?= C:/SDL2/lib/x64
 
 SOURCES := $(shell ls src/*.cpp)
 OBJECTS := $(patsubst src/%.cpp, $(OBJ_DIR)/%.o, $(SOURCES))
@@ -43,37 +43,57 @@ ifeq (${BUILD_TYPE}, release)
 CFLAGS += -O3
 endif
 
-TESTER_DIR := tester
-TESTER_BIN_DIR := ${TESTER_DIR}/build/bin
-TESTER_OBJ_DIR := ${TESTER_DIR}/build/obj
+TEST_BIN_DIR := tester/build/bin
+TEST_OBJ_DIR := tester/build/obj
+
+TEST_OBJECTS := $(patsubst src/%.cpp, $(TEST_OBJ_DIR)/%.o, $(SOURCES))
+TEST_OBJECTS += ${TEST_OBJ_DIR}/tester.o
+TEST_DEPS := $(patsubst src/%.cpp, $(TEST_OBJ_DIR)/%.d, $(SOURCES))
+TEST_DEPS += ${TEST_OBJ_DIR}/tester.d
+-include ${DEPS}
+
+define create_exe
+	@${MKDIR} -p ${dir $@}
+	${CC} ${CFLAGS} -L${SDL2_LIB} $^ -o $@ ${LDFLAGS} -Wl,--subsystem,console
+endef
+
+define build_objs
+	@${MKDIR} -p ${dir $@}
+	${CC} ${CFLAGS} -I${SDL2_INCLUDE} $< -o $@ -MMD -MF $(@:.o=.d) -c
+endef
 
 all: build test
 
-build: ${BIN_DIR}/${EXEC} ${BIN_DIR}/SDL2.dll
+# Build
+build: ${BIN_DIR}/${EXEC}
+	cp ${SDL2_LIB}/SDL2.dll ${BIN_DIR}/SDL2.dll
 
-${BIN_DIR}/${EXEC}: ${OBJECTS}
-	@${MKDIR} -p ${dir $@}
-	${CC} ${CFLAGS} $^ -o $@ -L${SDL2_LIB} ${LDFLAGS} -Wl,--subsystem,console
+${BIN_DIR}/${EXEC}: ${OBJ_DIR}/icon.o ${OBJECTS}
+	$(call create_exe)
+
+${OBJ_DIR}/icon.o: resources/icon.rc resources/gb-icon.ico
+	windres $< -o $@
 
 ${OBJ_DIR}/%.o: src/%.cpp
-	@${MKDIR} -p ${dir $@}
-	${CC} ${CFLAGS} $< -o $@ -I${SDL2_INCLUDE} -MMD -MF $(@:.o=.d) -c
+	$(call build_objs)
 
-${BIN_DIR}/SDL2.dll:
-	cp ${SDL2_LIB}/SDL2.dll $@
+# Testing
+test: ${TEST_BIN_DIR}/gbemu-tester.exe
+	cp ${SDL2_LIB}/SDL2.dll ${TEST_BIN_DIR}/SDL2.dll
+	${TEST_BIN_DIR}/gbemu-tester.exe
 
-test: ${TESTER_BIN_DIR}/gbemu-tester.exe ${TESTER_BIN_DIR}/SDL2.dll
+${TEST_BIN_DIR}/gbemu-tester.exe: ${TEST_OBJECTS}
+	$(call create_exe)
 
-${TESTER_BIN_DIR}/gbemu-tester.exe: ${TESTER_OBJ_DIR}/tester.o ${OBJECTS}
-	@${MKDIR} -p ${dir $@}
-	${CC} ${CFLAGS} $^ -o $@ -L${SDL2_LIB} ${LDFLAGS} -Wl,--subsystem,console
+${TEST_OBJ_DIR}/tester.o: tester/tester.cpp
+	$(eval CFLAGS += -DPLAYABLE=false -I./src)
+	$(call build_objs)
 
-${TESTER_OBJ_DIR}/tester.o: ${TESTER_DIR}/tester.cpp
-	@${MKDIR} -p ${dir $@}
-	${CC} ${CFLAGS} $< -o $@ -I${SDL2_INCLUDE} -c
+${TEST_OBJ_DIR}/%.o: src/%.cpp
+	$(eval CFLAGS += -DPLAYABLE=false)
+	$(call build_objs)
 
-${TESTER_BIN_DIR}/SDL2.dll:
-	cp ${SDL2_LIB}/SDL2.dll $@
-
+# Clean
 clean:
-	${RM} -f ${OBJECTS} ${DEPS} ${BIN_DIR}/*
+	${RM} -f ${OBJ_DIR}/* ${BIN_DIR}/*
+	${RM} -f ${TEST_OBJ_DIR}/* ${TEST_BIN_DIR}/*

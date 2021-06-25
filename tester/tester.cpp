@@ -1,89 +1,110 @@
+#include <cstring>
+#include <filesystem>
 #include <iostream>
+#include <vector>
 
-#ifdef _WIN32
-#include <tchar.h>
-#include <windows.h>
-#endif
-
-#include "../src/game_boy.hpp"
+#include "game_boy.hpp"
 
 namespace {
+GameBoy gameboy;
+Debugger debugger;
 
-void test_rom(GameBoy& gameboy, std::string path, std::string passOut, std::string failOut) {
-    gameboy.load(path.c_str());
-    size_t pIndex = 0;
-    size_t fIndex = 0;
-    bool running = true;
-    while (running) {
-        gameboy.emulate_frame();
-        if (gameboy.get_serial_out() == passOut[pIndex]) {
-            if (++pIndex == passOut.size()) {
-                running = false;
-                std::cout << "x PASSED: " << path << std::endl;
+size_t numPassed = 0;
+size_t numTests;
+const std::vector<std::string> excludeExtensions = {
+    "dmg0", "S", "mgb", "sgb", "sgb2",
+};
+
+void test_dir(const std::filesystem::path& file, const std::vector<std::string>& excludeList) {
+    std::vector<std::string> files;
+    for (const auto& file : std::filesystem::directory_iterator(file)) {
+        bool doExclude = false;
+        for (const auto& excludeFile : excludeList) {
+            if (!file.path().filename().compare(excludeFile)) {
+                doExclude = true;
+                break;
             }
-        } else {
-            pIndex = 0;
         }
-        if (gameboy.get_serial_out() == failOut[fIndex]) {
-            if (++fIndex == failOut.size()) {
-                running = false;
-                std::cout << "  FAILED: " << path << std::endl;
+        if (doExclude) {
+            continue;
+        }
+        if (file.is_directory()) {
+            test_dir(file.path(), excludeList);
+        } else if (file.path().extension().string() == ".gb") {
+            std::string filePathStr(file.path().string());
+            size_t i = 0;
+            for (; i < excludeExtensions.size(); i++) {
+                if (filePathStr.substr(filePathStr.find_last_of("-") + 1,
+                                       excludeExtensions[i].length()) == excludeExtensions[i]) {
+                    break;
+                }
             }
-        } else {
-            fIndex = 0;
+            if (i == excludeExtensions.size()) {
+                files.push_back(file.path().string());
+            }
         }
     }
-}
+    if (files.size() > 0) {
+        std::cout << " --- " << file.relative_path() << " --- " << std::endl;
+        for (size_t i = 0; i < files.size(); i++) {
+            std::cout << "[";
+            if (i + 1 < 10) {
+                std::cout << "0";
+            }
+            std::cout << i + 1 << "/" << files.size() << "] ";
 
+            gameboy.load(files[i].c_str());
+            bool running = true;
+            while (running) {
+                gameboy.emulate_frame();
+                if (debugger.is_paused()) {
+                    if (debugger.check_fib_in_registers()) {
+                        std::cout << "x PASSED: " << files[i].c_str() << std::endl;
+                        numPassed++;
+                    } else {
+                        std::cout << "  FAILED: " << files[i].c_str() << std::endl;
+                    }
+                    running = false;
+                    debugger.continue_exec();
+                }
+            }
+        }
+        numTests += files.size();
+    }
+}
 }  // namespace
 
 int main(int argc, char** argv) {
-    if (argc != 2) {
-        std::cerr << "Usage gbtester [test directory]" << std::endl;
-        return -1;
-    }
-
-#ifndef _WIN32
-    std::cerr << "Tester only supported on windows" << std::endl;
-    return -1;
-#else
-    std::string path(argv[1]);
-    char cPath[MAX_PATH];
-    WIN32_FIND_DATA ffd;
-    if (_tcslen(path.c_str()) > MAX_PATH - 4) {
-        std::cerr << "Directory path too long." << std::endl;
-        return -1;
-    }
-    _tcsncpy(cPath, path.c_str(), MAX_PATH);
-    if (cPath[_tcslen(cPath) - 1] != '\\') {
-        _tcscat(cPath, "\\");
-    }
-    _tcscat(cPath, "*.*");
-
-    HANDLE hFind = FindFirstFile(cPath, &ffd);
-    if (hFind == INVALID_HANDLE_VALUE) {
-        std::cerr << "Invalid handle value." << GetLastError() << std::endl;
-        return -1;
-    }
-
-    GameBoy gameboy;
-    Debugger debugger;
     gameboy.set_debugger(debugger);
     try {
-        bool running = true;
-        while (running) {
-            if (_tcscmp(ffd.cFileName, ".") != 0 && _tcscmp(ffd.cFileName, "..") != 0) {
-                if (FileManagement::is_path_extension(ffd.cFileName, "gb")) {
-                    test_rom(gameboy, (path + "\\" + ffd.cFileName).c_str(), "\"", "B");
-                } else if (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-                    // std::cout << "dir:" << ffd.cFileName << std::endl;
-                }
+        if (argc == 1) {
+            const std::vector<std::string> testRomPaths = {
+                "mooneye-gb_hwtests\\acceptance",
+                "mooneye-gb_hwtests\\emulator-only",
+            };
+            const std::vector<std::string> excludeList = {
+                "oam_dma",
+                "mbc2",
+            };
+
+            for (const auto& path : testRomPaths) {
+                test_dir(std::filesystem::path("tester\\roms\\" + path), excludeList);
             }
-            running = FindNextFile(hFind, &ffd);
+        } else if (argc == 2) {
+            test_dir(std::filesystem::path(argv[1]), std::vector<std::string>());
+        } else {
+            std::cout << "Usage: gbemu-tester [optional test directory]\tRuns all tests when no "
+                         "args provided"
+                      << std::endl;
+            return -1;
+        }
+        std::cout << "PASSED: [" << numPassed << "/" << numTests << "] tests" << std::endl;
+        if (numPassed < numTests) {
+            return -1;
         }
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
         return -1;
     }
-#endif
+    return 0;
 }

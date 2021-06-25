@@ -1,7 +1,5 @@
 #pragma once
 
-#include <cstdint>
-#include <cstring>
 #include <stdexcept>
 
 using u8 = uint8_t;
@@ -11,22 +9,14 @@ using u32 = uint32_t;
 using s8 = int8_t;
 using s16 = int16_t;
 
-#ifndef VERBOSE_LOG
-#define VERBOSE_LOG false
+#ifndef PLAYABLE
+#define PLAYABLE true
 #endif
 
 #define fatal(...)                                                                     \
     char buff[0xFF] = "FATAL ERROR: ";                                                 \
     snprintf(buff + 13 * sizeof(char), sizeof(buff) - 13 * sizeof(char), __VA_ARGS__); \
     throw std::runtime_error(buff)
-
-namespace FileManagement {
-
-bool is_path_extension(const char* path, const char* extension);
-
-std::string change_extension(const char* path, const char* extension);
-
-}  // namespace FileManagement
 
 template <typename T, int capacity>
 struct Queue {
@@ -58,7 +48,7 @@ constexpr int HEIGHT = 144;
 
 constexpr double MS_PER_FRAME = 16.7427;
 
-constexpr double MASTER_VOLUME = 3;
+constexpr double MASTER_VOLUME = 2;
 constexpr int SAMPLE_RATE = 48000;
 
 }  // namespace Constants

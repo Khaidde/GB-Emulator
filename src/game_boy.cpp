@@ -53,22 +53,25 @@ void GameBoy::load(const char* romPath) {
     int i = 0;
     for (int i = 0; i < NUM_CART_TYPES; i++) {
         if (rom[0x0147] == CART_TYPES[i].code) {
+            CartridgeInfo info;
+            std::string romPathStr(romPath);
+            info.isCGB = romPathStr.substr(romPathStr.find_last_of(".")) == ".gbc";
+            info.savePath = romPathStr.substr(0, romPathStr.find_last_of(".")) + ".sav";
+            info.hasRam = CART_TYPES[i].hasRam;
+            info.hasBattery = CART_TYPES[i].hasBattery;
             switch (CART_TYPES[i].mbc) {
                 case 0:
-                    cartridge = std::make_unique<ROMOnly>(romPath, &rom[0]);
+                    cartridge = std::make_unique<ROMOnly>(info, &rom[0]);
                     break;
                 case 1:
-                    cartridge = std::make_unique<MBC1>(romPath, &rom[0]);
+                    cartridge = std::make_unique<MBC1>(info, &rom[0]);
                     break;
                 case 5:
-                    cartridge = std::make_unique<MBC5>(romPath, &rom[0]);
+                    cartridge = std::make_unique<MBC5>(info, &rom[0]);
                     break;
             }
-            cartridge->set_has_ram(CART_TYPES[i].hasRam);
-            cartridge->set_has_battery(CART_TYPES[i].hasBattery);
             if (CART_TYPES[i].hasBattery) {
-                cartridge->load_save_file(
-                    FileManagement::change_extension(romPath, ".sav").c_str());
+                cartridge->try_load_save_file();
             }
         }
     }
@@ -78,11 +81,9 @@ void GameBoy::load(const char* romPath) {
     memory.set_cartridge(cartridge.get());
 }
 
-Cartridge* GameBoy::get_cartridge() { return cartridge.get(); }
-
 void GameBoy::set_debugger(Debugger& debugger) {
     this->debugger = &debugger;
-    debugger.init(&cpu, &memory);
+    debugger.init(&cpu, &ppu, &memory);
 
     cpu.set_debugger(debugger);
     memory.set_debugger(debugger);
@@ -126,5 +127,3 @@ void GameBoy::emulate_frame(u32* screenBuffer, s16* sampleBuffer, u16 sampleLen)
         apu.sample(sampleBuffer, sampleLen);
     }
 }
-
-u8 GameBoy::get_serial_out() { return memory.read(IOReg::SB_REG); }

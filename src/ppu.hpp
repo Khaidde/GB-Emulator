@@ -123,6 +123,7 @@ private:
 
     u32 get_color(FIFOData&& data);
 
+    friend class Debugger;
     Debugger* debugger;
     Memory* memory;
 

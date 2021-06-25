@@ -108,7 +108,6 @@ void PPU::emulate_clock() {
         return;
     }
     ppuClocks++;
-    debugger->log_ppu((int)curPPUState, clockCnt / 2);
     if (clockCnt-- > 1) {
         return;
     }

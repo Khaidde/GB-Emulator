@@ -3,6 +3,7 @@
 #include "cpu.hpp"
 #include "general.hpp"
 #include "memory.hpp"
+#include "ppu.hpp"
 
 class CPU;
 class Memory;
@@ -24,17 +25,7 @@ class Memory;
 
 class Debugger {
 public:
-    void init(CPU* c, Memory* memory);
-
-private:
-    int ppuCnt;
-    int ppuMode;
-
-public:
-    void log_ppu(int mode, int cnt) {
-        ppuMode = mode;
-        ppuCnt = cnt;
-    }
+    void init(CPU* cpu, PPU* ppu, Memory* memory);
 
 private:
     void print_reg(u16 address, const char* name);
@@ -49,8 +40,11 @@ public:
     void continue_exec() { pause = false; }
     bool is_paused() { return pause; }
 
+    bool check_fib_in_registers();
+
 private:
     CPU* cpu;
+    PPU* ppu;
     Memory* memory;
 
     u8 stepCnt;

@@ -2,44 +2,33 @@
 
 #include "general.hpp"
 
+struct CartridgeInfo {
+    std::string savePath;
+    bool isCGB;
+
+    bool hasRam = false;
+    bool hasBattery = false;
+    bool hasTimer = false;   // TODO unimplemented
+    bool hasRumble = false;  // TODO unimplemented
+};
+
 class Cartridge {
 public:
-    Cartridge(const char* cartName, size_t maxRomBanks, size_t maxRamBanks, const char* filePath,
+    Cartridge(CartridgeInfo& info, const char* cartName, size_t maxRomBanks, size_t maxRamBanks,
               u8* rom);
     virtual ~Cartridge();
 
-    void load_save_file(const char* savePath);
+    void try_load_save_file();
 
     virtual void write(u16 addr, u8 val) = 0;
 
     u8 read_rom(u16 addr);
     u8 read_ram(u16 addr);
 
-    bool is_CGB() { return isCGB; }
-
-    void set_has_ram(bool cartHasRam) { this->hasRam = cartHasRam; }
-    void set_has_battery(bool cartHasBattery) { this->hasBattery = cartHasBattery; }
-    void set_has_timer(bool cartHasTimer) { this->hasTimer = cartHasTimer; }
-
-    void print_cartridge_info();
-
-private:
-    u8 read_header(u16 addr);
+    bool is_CGB() { return info.isCGB; }
 
 protected:
-    bool isCGB;
-
-    const char* cartridgeName;
-    const char* filePath;
-
-    static constexpr u16 HEADER_START = 0x104;
-    static constexpr u16 HEADER_SIZE = 0x150 - HEADER_START;
-    u8 header[HEADER_SIZE];
-
-    bool hasRam = false;
-    bool hasBattery = false;
-    bool hasTimer = false;   // TODO unimplemented
-    bool hasRumble = false;  // TODO unimplemented
+    CartridgeInfo info;
 
     static constexpr u16 ROM_BANK_SIZE = 0x4000;
     static constexpr u16 RAM_BANK_SIZE = 0x2000;
@@ -48,12 +37,8 @@ protected:
     using RomBank = u8[ROM_BANK_SIZE];
     using RamBank = u8[RAM_BANK_SIZE];
 
-    u8 romType;
-    u8 ramType;
     size_t numRomBanks;
     size_t numRamBanks;
-    const size_t MAX_ROM_BANKS;
-    const size_t MAX_RAM_BANKS;
 
     RomBank* romBanks;
     RamBank* ramBanks;
@@ -67,13 +52,13 @@ protected:
 
 class ROMOnly : public Cartridge {
 public:
-    ROMOnly(const char* filePath, u8* rom);
+    ROMOnly(CartridgeInfo& info, u8* rom);
     void write(u16 addr, u8 val) override;
 };
 
 class MBC1 : public Cartridge {
 public:
-    MBC1(const char* filePath, u8* rom);
+    MBC1(CartridgeInfo& info, u8* rom);
     void write(u16 addr, u8 val) override;
 
 private:
@@ -87,7 +72,7 @@ private:
 
 class MBC5 : public Cartridge {
 public:
-    MBC5(const char* filePath, u8* rom);
+    MBC5(CartridgeInfo& info, u8* rom);
     void write(u16 addr, u8 val) override;
 
 private:

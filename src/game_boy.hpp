@@ -15,7 +15,6 @@ class GameBoy {
 public:
     GameBoy();
     void load(const char* romPath);
-    Cartridge* get_cartridge();
 
     void set_debugger(Debugger& debugger);
     void handle_key_code(bool pressed, JoypadButton button) {
@@ -24,9 +23,6 @@ public:
 
     void emulate_frame();
     void emulate_frame(u32* screenBuffer, s16* sampleBuffer, u16 sampleLen);
-
-    // TODO there might be several serial out values per frame
-    u8 get_serial_out();
 
 private:
     Debugger* debugger;

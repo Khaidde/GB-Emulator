@@ -117,7 +117,9 @@ void Memory::write(u16 addr, u8 val) {
             mem[addr] = 0xC0 | (val & 0x30) | (mem[addr] & 0x0F);
             break;
         case IOReg::SB_REG:
-            // printf("%c", val);
+#if PLAYABLE
+            printf("%c", val);
+#endif
             mem[addr] = val;
             break;
         case IOReg::SC_REG:

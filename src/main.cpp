@@ -230,7 +230,6 @@ int main(int argc, char** argv) {
 
     try {
         gameboy.load(argv[1]);
-        gameboy.get_cartridge()->print_cartridge_info();
         run(screen, gameboy, debugger);
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;

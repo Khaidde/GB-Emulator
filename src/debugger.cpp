@@ -1,7 +1,8 @@
 #include "debugger.hpp"
 
-void Debugger::init(CPU* cpu, Memory* memory) {
+void Debugger::init(CPU* cpu, PPU* ppu, Memory* memory) {
     this->cpu = cpu;
+    this->ppu = ppu;
     this->memory = memory;
 
     stepCnt = 0;
@@ -23,7 +24,7 @@ void Debugger::print_info() {
     printf("\tly=%02x lcdc=%02x stat=%02x\n", memory->read(IOReg::LY_REG),
            memory->read(IOReg::LCDC_REG), memory->read(IOReg::STAT_REG));
 
-    printf("cc=%d (%d)\n", ppuCnt + 2, ppuMode);
+    printf("cc=%d (%d)\n", (ppu->clockCnt + 4) / 2, ppu->curPPUState);
 
     // print_reg(IOReg::JOYP_REG, "Joypad");
 
@@ -48,6 +49,17 @@ bool Debugger::can_step() {
     if (stepCnt > 0) {
         stepCnt--;
         return true;
+    }
+    return false;
+}
+
+bool Debugger::check_fib_in_registers() {
+    if (cpu->BC.hi == 3 && cpu->BC.lo == 5) {
+        if (cpu->DE.hi == 8 && cpu->DE.lo == 13) {
+            if (cpu->HL.hi == 21 && cpu->HL.lo == 34) {
+                return true;
+            }
+        }
     }
     return false;
 }
