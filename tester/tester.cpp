@@ -80,6 +80,7 @@ int main(int argc, char** argv) {
         if (argc == 1) {
             const std::vector<std::string> testRomPaths = {
                 "mooneye-gb_hwtests\\acceptance",
+                // "mooneye-gb_hwtests\\acceptance\\ppu",
                 "mooneye-gb_hwtests\\emulator-only",
             };
             const std::vector<std::string> excludeList = {

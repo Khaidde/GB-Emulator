@@ -72,8 +72,12 @@ void CPU::emulate_cycle() {
     }
 
     if (--cycleCnt == 0) {
-        // PAUSE_EXEC_OCC(this, debugger, 0x48, 1);
-        // PAUSE_EXEC(this, debugger, 0x101);
+        // PAUSE_EXEC_OCC(this, debugger, 0x40, 3300);
+        // PAUSE_EXEC(this, debugger, 0x47F9);
+        // if (memory->read(IOReg::LYC_REG) == 0x01) {
+        // PAUSE_EXEC(this, debugger, 0x4950);
+        // }
+        // PAUSE_EXEC(this, debugger, 0x47F3);
     }
 
     if (callbackCycle > 0) {

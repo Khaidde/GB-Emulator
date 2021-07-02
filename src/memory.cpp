@@ -40,7 +40,7 @@ u8 Memory::read(u16 addr) {
         return cartridge->read_rom(addr);
     }
     if (addr < 0xA000) {
-        if (ppu->is_vram_blocked()) {
+        if (ppu->is_vram_read_blocked()) {
             return 0xFF;
         }
         return mem[addr];
@@ -52,7 +52,7 @@ u8 Memory::read(u16 addr) {
         if (dmaInProgress) {
             return addr < 0xFEA0 ? 0xFF : 0x00;
         }
-        if (ppu->is_oam_blocked()) {
+        if (ppu->is_oam_read_blocked()) {
             return 0xFF;
         }
         return mem[addr];
@@ -71,7 +71,7 @@ void Memory::write(u16 addr, u8 val) {
         cartridge->write(addr, val);
         return;
     }
-    if (ppu->is_vram_blocked() && 0x8000 <= addr && addr < 0xA000) {
+    if (ppu->is_vram_write_blocked() && 0x8000 <= addr && addr < 0xA000) {
         return;
     }
     if (0xC000 <= addr && addr < 0xDE00) {
@@ -87,7 +87,7 @@ void Memory::write(u16 addr, u8 val) {
                 fatal("Bad write to addr=%04x", addr);
             }
         }
-        if (ppu->is_oam_blocked()) {
+        if (ppu->is_oam_write_blocked()) {
             return;
         }
     }

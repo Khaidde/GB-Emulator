@@ -24,28 +24,38 @@ struct SpriteList {
 };
 
 struct Fetcher {
-    void reset();
-
-    bool doFetch;
-    enum {
+    enum FetchState {
         READ_TILE_ID,
         READ_TILE_0,
         READ_TILE_1,
         PUSH,
-    } fetchState;
+        SLEEP,
+    };
+    u8 curFetchState;
+    static constexpr FetchState FETCH_STATES[] = {
+        SLEEP, READ_TILE_ID, SLEEP, READ_TILE_0, SLEEP, READ_TILE_1, PUSH, PUSH,
+    };
     Sprite* curSprite;
-    bool windowMode;
     u8 tileX;
+
+    bool windowMode;
+    bool windowXEnable;
+    u8 windowY;
 
     u16 tileRowAddrOff;
     u8 data0;
     u8 data1;
 };
 
+enum DMGPalette : u8 {
+    BGP = 0,
+    OBP0 = 1,
+    OBP1 = 2,
+};
 struct FIFOData {
     u8 colIndex;
-    bool isSprite;
-    u16 palleteAddr;
+    u8 paletteNum;
+    bool bgPriority;
 };
 
 enum class LCDCFlag : u8 {
@@ -69,8 +79,10 @@ enum PPUMode : u8 {
 enum class PPUState {
     OAM_3,
     OAM_4,
+    OAM_PRE_1,
     OAM,
     LCD_4,
+    LCD_5,
     LCD,
     H_BLANK_4,
     H_BLANK,
@@ -78,6 +90,7 @@ enum class PPUState {
     V_BLANK_144_4,
     V_BLANK_145_152_4,
     V_BLANK_153_4,
+    V_BLANK_153_8,
     V_BLANK_153_12,
     V_BLANK,
 };
@@ -86,9 +99,7 @@ class PPU {
 public:
     static constexpr int OAM_SEARCH_CLOCKS = 80;
 
-    static constexpr int LCD_AND_H_BLANK_CLOCKS = 376;
-
-    static constexpr int SCAN_LINE_CLOCKS = OAM_SEARCH_CLOCKS + LCD_AND_H_BLANK_CLOCKS;
+    static constexpr int SCAN_LINE_CLOCKS = 456;
     static constexpr int V_BLANK_END_LINE = 154;
 
     static constexpr int TOTAL_CLOCKS = SCAN_LINE_CLOCKS * V_BLANK_END_LINE;
@@ -98,8 +109,10 @@ public:
     void set_debugger(Debugger& debug) { this->debugger = &debug; }
 
     void write_register(u16 addr, u8 val);
-    bool is_vram_blocked();
-    bool is_oam_blocked();
+    bool is_oam_read_blocked();
+    bool is_oam_write_blocked();
+    bool is_vram_read_blocked();
+    bool is_vram_write_blocked();
 
     void render(u32* pixelBuffer);
     void emulate_clock();
@@ -107,21 +120,19 @@ public:
 private:
     void set_stat_mode(PPUMode statMode);
     void update_coincidence();
+    void clear_coincidence();
     void try_lyc_intr();
     void try_mode_intr(u8 statMode);
-    // void update_mode_intr(PPUMode statMode);
     void clear_stat_mode_intr(PPUMode statMode);
 
     void try_trigger_stat();
 
-    void handle_pixel_push();
+    void handle_pixel_render();
 
     void background_fetch();
     void sprite_fetch();
 
     bool get_lcdc_flag(LCDCFlag flag);
-
-    u32 get_color(FIFOData&& data);
 
     friend class Debugger;
     Debugger* debugger;
@@ -146,7 +157,7 @@ private:
     bool bufferSel;
     FrameBuffer frameBuffers[2];
 
-    short ppuClocks;
+    short lineClocks;
     short clockCnt;
     PPUState curPPUState;
 
@@ -160,17 +171,22 @@ private:
     Fetcher fetcher;
 
     static constexpr u8 FIFO_SIZE = 16;
-    Queue<FIFOData, FIFO_SIZE> pxlFifo;
+    Queue<FIFOData, FIFO_SIZE> bgFifo;
+    Queue<FIFOData, FIFO_SIZE> spriteFifo;
 
     u8 lockedSCX;
 
-    u8 numDiscardedPixels;
-    u8 curPixelX;
+    short curPixelX;
     u8 line;
 
     u8 statIntrFlags;  // 3: ly=lyc, 2: oam, 1: v-blank, 0: h-blank
     u8 prevIntrFlags;
     u8 internalStatEnable;
+
+    bool oamBlockRead;
+    bool oamBlockWrite;
+    bool vramBlockRead;
+    bool vramBlockWrite;
 
     // Mode mode;
 

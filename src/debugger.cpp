@@ -24,7 +24,11 @@ void Debugger::print_info() {
     printf("\tly=%02x lcdc=%02x stat=%02x\n", memory->read(IOReg::LY_REG),
            memory->read(IOReg::LCDC_REG), memory->read(IOReg::STAT_REG));
 
-    printf("cc=%d (%d)\n", (ppu->clockCnt + 4) / 2, ppu->curPPUState);
+    int clockCnt = (ppu->clockCnt + 4) / 2;
+    if ((memory->read(IOReg::STAT_REG) & 0x3) == 0x3) {
+        clockCnt = ((172 + 80) - ppu->lineClocks) / 2;
+    }
+    printf("cc=%d (%d)\n", clockCnt, ppu->curPPUState);
 
     // print_reg(IOReg::JOYP_REG, "Joypad");
 
