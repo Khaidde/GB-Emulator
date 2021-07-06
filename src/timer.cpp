@@ -8,7 +8,15 @@ Timer::Timer(Memory& memory) : memory(&memory) {
 }
 
 void Timer::restart() {
-    clocks = 0xABCC;
+    // Since nops have a precision of 4 cycles, there's
+    // no real way to know the exact value through test roms
+    if (memory->is_CGB()) {
+        clocks = 0x267B;
+        // 0x2678 <= clocks < 0x267C
+    } else {
+        clocks = 0xABCC;
+        // 0xABCC <= clocks <= 0xABD0
+    }
     timaScheduled = false;
 
     oldBitSet = false;

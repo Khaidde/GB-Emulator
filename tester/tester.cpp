@@ -12,7 +12,7 @@ Debugger debugger;
 size_t numPassed = 0;
 size_t numTests;
 const std::vector<std::string> excludeExtensions = {
-    "dmg0", "S", "mgb", "sgb", "sgb2",
+    "A", "cgb0", "dmg0", "S", "mgb", "sgb", "sgb2",
 };
 
 void test_dir(const std::filesystem::path& file, const std::vector<std::string>& excludeList) {
@@ -30,17 +30,20 @@ void test_dir(const std::filesystem::path& file, const std::vector<std::string>&
         }
         if (file.is_directory()) {
             test_dir(file.path(), excludeList);
-        } else if (file.path().extension().string() == ".gb") {
-            std::string filePathStr(file.path().string());
-            size_t i = 0;
-            for (; i < excludeExtensions.size(); i++) {
-                if (filePathStr.substr(filePathStr.find_last_of("-") + 1,
-                                       excludeExtensions[i].length()) == excludeExtensions[i]) {
-                    break;
+        } else {
+            std::string extension(file.path().extension().string());
+            if (extension == ".gb" || extension == ".gbc") {
+                std::string filePathStr(file.path().string());
+                size_t i = 0;
+                for (; i < excludeExtensions.size(); i++) {
+                    if (filePathStr.substr(filePathStr.find_last_of("-") + 1,
+                                           excludeExtensions[i].length()) == excludeExtensions[i]) {
+                        break;
+                    }
                 }
-            }
-            if (i == excludeExtensions.size()) {
-                files.push_back(file.path().string());
+                if (i == excludeExtensions.size()) {
+                    files.push_back(file.path().string());
+                }
             }
         }
     }
@@ -78,11 +81,10 @@ int main(int argc, char** argv) {
     gameboy.set_debugger(debugger);
     try {
         if (argc == 1) {
-            const std::vector<std::string> testRomPaths = {
-                "mooneye-gb_hwtests\\acceptance",
-                // "mooneye-gb_hwtests\\acceptance\\ppu",
-                "mooneye-gb_hwtests\\emulator-only",
-            };
+            const std::vector<std::string> testRomPaths = {"mooneye-gb_hwtests\\acceptance",
+                                                           // "mooneye-gb_hwtests\\acceptance\\ppu",
+                                                           // "mooneye-gb_hwtests\\emulator-only",
+                                                           "mooneye-gb_hwtests\\misc"};
             const std::vector<std::string> excludeList = {
                 "oam_dma",
                 "multicart_rom_8Mb.gb",

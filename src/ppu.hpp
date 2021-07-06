@@ -133,6 +133,7 @@ private:
     void sprite_fetch();
 
     bool get_lcdc_flag(LCDCFlag flag);
+    bool is_window_enabled();
 
     friend class Debugger;
     Debugger* debugger;
@@ -150,9 +151,6 @@ private:
     static constexpr u16 OAM_START_ADDR = 0xFE00;
     u8* oamAddrBlock;
 
-    static constexpr u16 VRAM_START_ADDR = 0x8000;
-    u8* vramAddrBlock;
-
     using FrameBuffer = u32[160 * 144];
     bool bufferSel;
     FrameBuffer frameBuffers[2];
@@ -166,8 +164,6 @@ private:
     static constexpr u8 TILESET_SIZE = 32;  // width and height of vram tileset
     static constexpr u8 TILE_MEM_LEN = 16;
     static constexpr u8 TILE_PX_SIZE = 8;  // width and height of a tile in pixels
-    static constexpr u16 VRAM_TILE_DATA_0 = 0x8000;
-    static constexpr u16 VRAM_TILE_DATA_1 = 0x9000;
     Fetcher fetcher;
 
     static constexpr u8 FIFO_SIZE = 16;

@@ -3,8 +3,7 @@
 #include <fstream>
 #include <vector>
 
-GameBoy::GameBoy() : input(memory), timer(memory), ppu(memory), apu(memory) {
-    cpu.set_memory(memory);
+GameBoy::GameBoy() : cpu(memory), input(memory), timer(memory), ppu(memory), apu(memory) {
     memory.set_input(input);
     memory.set_timer(timer);
     memory.set_ppu(ppu);
@@ -34,13 +33,6 @@ constexpr struct {
 }  // namespace
 
 void GameBoy::load(const char* romPath) {
-    cpu.restart();
-    memory.restart();
-    input.restart();
-    timer.restart();
-    ppu.restart();
-    apu.restart();
-
     std::ifstream file(romPath, std::ios::binary | std::ios::ate);
     if (!file.is_open()) {
         fatal("Can't read from file: %s\n", romPath);
@@ -84,6 +76,13 @@ void GameBoy::load(const char* romPath) {
         fatal("Unimplemented cartridge type: %d\n", rom[0x0147]);
     }
     memory.set_cartridge(cartridge.get());
+
+    cpu.restart();
+    memory.restart();
+    input.restart();
+    timer.restart();
+    ppu.restart();
+    apu.restart();
 }
 
 void GameBoy::set_debugger(Debugger& debugger) {

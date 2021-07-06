@@ -42,6 +42,9 @@ public:
 
     u8& ref(u16 addr);
     u8 read(u16 addr);
+    u8 read_vram(u16 addr);
+    u8 read_tile_map(u16 addr);
+    u8 read_tile_attrib(u16 addr);
     void write(u16 addr, u8 val);
 
     void schedule_read(u16 addr, u8* dest, u8 cycle);
@@ -64,6 +67,14 @@ private:
 
     static constexpr int MEMORY_SIZE = 0x10000;
     u8 mem[MEMORY_SIZE];
+
+    using WRAMBank = u8[0x1000];
+    WRAMBank* curWramBank;
+    WRAMBank wramBanks[8];  // WRAM banks 1-7
+
+    using VRAMBank = u8[0x2000];
+    VRAMBank* curVramBank;
+    VRAMBank vramBanks[2];
 
     Queue<MemoryOp, 16> scheduledMemoryOps;
     u8 cycleCnt;

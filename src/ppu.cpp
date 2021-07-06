@@ -22,7 +22,6 @@ PPU::PPU(Memory& memory) : memory(&memory) {
     wx = &memory.ref(IOReg::WX_REG);
 
     oamAddrBlock = &memory.ref(OAM_START_ADDR);
-    vramAddrBlock = &memory.ref(VRAM_START_ADDR);
 }
 
 void PPU::restart() {
@@ -149,6 +148,12 @@ void PPU::emulate_clock() {
             }
             try_trigger_stat();
 
+            // TODO check the timing wy trigger
+            if (line == *wy) {
+                fetcher.windowMode = true;
+                fetcher.windowY = 0;
+            }
+
             oamBlockWrite = true;
             curPPUState = PPUState::OAM_PRE_1;
             clockCnt = OAM_SEARCH_CLOCKS - 4 - 1;
@@ -164,6 +169,9 @@ void PPU::emulate_clock() {
                 u8 y = *spritePtr;
                 u8 x = *(spritePtr + 1);
 
+                if (x == 0x50 && y == 0x58) {
+                    // printf("---%d\n", get_lcdc_flag(LCDCFlag::SPRITE_SIZE));
+                }
                 u8 botBound = line + 16;
                 u8 spriteHeight = get_lcdc_flag(LCDCFlag::SPRITE_SIZE) ? 16 : 8;
                 if (x > 0 && botBound - spriteHeight < y && y <= botBound) {
@@ -374,12 +382,8 @@ void PPU::handle_pixel_render() {
     if (fetcher.curSprite) {
         return;
     }
-    if (line == *wy) {
-        fetcher.windowMode = true;
-        fetcher.windowY = 0;
-    }
     if (fetcher.windowMode && !fetcher.windowXEnable && curPixelX == *wx - 7) {
-        if (get_lcdc_flag(LCDCFlag::WINDOW_ENABLE)) {
+        if (is_window_enabled()) {
             fetcher.curFetchState = 0;
 
             fetcher.tileX = 0;
@@ -437,45 +441,45 @@ void PPU::background_fetch() {
     switch (fetcher.FETCH_STATES[fetcher.curFetchState]) {
         case Fetcher::READ_TILE_ID: {
             // TODO verify that flag is checked and turns off during READ_TILE_ID
-            if (fetcher.windowXEnable && !get_lcdc_flag(LCDCFlag::WINDOW_ENABLE)) {
+            if (fetcher.windowXEnable && !is_window_enabled()) {
                 fetcher.windowXEnable = false;
             }
 
-            u16 tileMap = (fetcher.windowXEnable ? get_lcdc_flag(LCDCFlag::WINDOW_TILE_SELECT)
-                                                 : get_lcdc_flag(LCDCFlag::BG_TILE_SELECT))
-                              ? 0x9C00
-                              : 0x9800;
-
+            u16 tileMap = 0x1800;
+            if (fetcher.windowXEnable) {
+                if (get_lcdc_flag(LCDCFlag::WINDOW_TILE_SELECT)) {
+                    tileMap = 0x1C00;
+                }
+            } else {
+                if (get_lcdc_flag(LCDCFlag::BG_TILE_SELECT)) {
+                    tileMap = 0x1C00;
+                }
+            }
             u16 xOff = fetcher.windowXEnable ? 0 : lockedSCX;
             u16 yOff = fetcher.windowXEnable ? fetcher.windowY : (*scy + line);
 
             u8 tileX = (xOff / TILE_PX_SIZE + fetcher.tileX) % TILESET_SIZE;
             u8 tileY = (yOff / TILE_PX_SIZE) % TILESET_SIZE;
-            s8 tileIndex =
-                (s8)vramAddrBlock[(tileX + tileY * TILESET_SIZE) + tileMap - VRAM_START_ADDR];
+
+            u16 tileIndexAddr = (tileX + tileY * TILESET_SIZE) + tileMap;
+            s8 tileIndex = (s8)memory->read_tile_map(tileIndexAddr);
+
             u8 tileByteOff = (yOff % TILE_PX_SIZE) * 2;
 
             if (get_lcdc_flag(LCDCFlag::TILE_DATA_SELECT)) {
                 fetcher.tileRowAddrOff = (u8)tileIndex * TILE_MEM_LEN + tileByteOff;
             } else {
-                fetcher.tileRowAddrOff = (u16)(VRAM_TILE_DATA_1 - VRAM_TILE_DATA_0 +
-                                               tileIndex * TILE_MEM_LEN + tileByteOff);
+                fetcher.tileRowAddrOff = (u16)(0x1000 + tileIndex * TILE_MEM_LEN + tileByteOff);
             }
-            if (line == 130) {
-                // printf("b-%d\n", ppuClocks);
-            }
+            // if (line == 130) printf("b-%d\n", ppuClocks);
         } break;
         case Fetcher::READ_TILE_0:
-            fetcher.data0 = vramAddrBlock[fetcher.tileRowAddrOff];
-            if (line == 130) {
-                // printf("0-%d\n", ppuClocks);
-            }
+            fetcher.data0 = memory->read_vram(fetcher.tileRowAddrOff);
+            // if (line == 130) printf("0-%d\n", ppuClocks);
             break;
         case Fetcher::READ_TILE_1:
-            fetcher.data1 = vramAddrBlock[fetcher.tileRowAddrOff + 1];
-            if (line == 130) {
-                // printf("1-%d\n", ppuClocks);
-            }
+            fetcher.data1 = memory->read_vram(fetcher.tileRowAddrOff + 1);
+            // if (line == 130) printf("1-%d\n", ppuClocks);
         case Fetcher::PUSH:
             if (bgFifo.size == 0) {
                 if (get_lcdc_flag(LCDCFlag::BG_WINDOW_ENABLE)) {
@@ -515,33 +519,27 @@ void PPU::sprite_fetch() {
                 tileIndex &= ~0x1;  // Make tileIndex even
             }
 
-            u8 tileByteOff;
-            bool yFlip = fetcher.curSprite->flags & (1 << 6);
-            if (yFlip) {
-                tileByteOff = (fetcher.curSprite->y - line - 0x1) * 2;
+            u8 yMask = get_lcdc_flag(LCDCFlag::SPRITE_SIZE) ? 0xF : 0x7;
+            u8 tileY = (line - fetcher.curSprite->y) & yMask;
+            fetcher.tileRowAddrOff = tileIndex * TILE_MEM_LEN;
+            if (fetcher.curSprite->flags & (1 << 6)) {
+                fetcher.tileRowAddrOff += (tileY ^ yMask) * 2;
             } else {
-                tileByteOff = (0x10 - (fetcher.curSprite->y - line)) * 2;
+                fetcher.tileRowAddrOff += tileY * 2;
             }
-
-            fetcher.tileRowAddrOff = tileIndex * TILE_MEM_LEN + tileByteOff;
         } break;
         case Fetcher::READ_TILE_0:
-            fetcher.data0 = vramAddrBlock[fetcher.tileRowAddrOff];
+            fetcher.data0 = memory->read_vram(fetcher.tileRowAddrOff);
             break;
         case Fetcher::READ_TILE_1:
-            fetcher.data1 = vramAddrBlock[fetcher.tileRowAddrOff + 1];
+            fetcher.data1 = memory->read_vram(fetcher.tileRowAddrOff + 1);
         case Fetcher::PUSH: {
             bool bgPriority = fetcher.curSprite->flags & (1 << 7);
             u8 palette = ((fetcher.curSprite->flags & (1 << 4)) != 0) + DMGPalette::OBP0;
             bool xFlip = fetcher.curSprite->flags & (1 << 5);
             u8 fifoSize = spriteFifo.size;
             for (int i = 0; i < TILE_PX_SIZE; i++) {
-                u8 align;
-                if (xFlip) {
-                    align = 1 << i;
-                } else {
-                    align = (1 << 7) >> i;
-                }
+                u8 align = xFlip ? (1 << i) : (1 << 7) >> i;
                 bool hi = fetcher.data1 & align;
                 bool lo = fetcher.data0 & align;
                 u8 col = (hi << 1) | lo;
@@ -563,3 +561,8 @@ void PPU::sprite_fetch() {
 }
 
 bool PPU::get_lcdc_flag(LCDCFlag flag) { return *lcdc & (1 << (u8)flag); }
+
+bool PPU::is_window_enabled() {
+    return get_lcdc_flag(LCDCFlag::WINDOW_ENABLE) &&
+           (memory->is_CGB() || get_lcdc_flag(LCDCFlag::BG_WINDOW_ENABLE));
+}

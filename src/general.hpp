@@ -131,6 +131,34 @@ enum : u16 {
     WY_REG = 0xFF4A,    // window y pos
     WX_REG = 0xFF4B,    // window x pos + 7
 
+    // Prepare speed switch
+    KEY1_REG = 0xFF4D,
+
+    // Vram bank number
+    VBK_REG = 0xFF4F,
+
+    // HDMA
+    HDMA1_REG = 0xFF51,  // source high
+    HDMA2_REG = 0xFF52,  // source low
+    HDMA3_REG = 0xFF53,  // destination high
+    HDMA4_REG = 0xFF54,  // destination low
+    HDMA5_REG = 0xFF55,  // dma length/mode/start
+
+    // Infared communications port
+    RP_REG = 0xFF56,
+
+    // Palettes
+    BGPI_REG = 0xFF68,
+    BGPD_REG = 0xFF69,
+    OBPI_REG = 0xFF6A,
+    OBPD_REG = 0xFF6B,
+
+    // Object priority mode
+    OPRI_REG = 0xFF6C,
+
+    // Wram bank number
+    SVBK_REG = 0xFF70,
+
     IE_REG = 0xFFFF,
 };
 }  // namespace IOReg

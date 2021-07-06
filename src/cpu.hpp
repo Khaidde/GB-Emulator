@@ -17,8 +17,7 @@ union RegPair {
 
 class CPU {
 public:
-    CPU() { restart(); }
-    void set_memory(Memory& mem) { this->memory = &mem; }
+    CPU(Memory& memory);
     void set_debugger(Debugger& debug) { this->debugger = &debug; }
     void restart();
 

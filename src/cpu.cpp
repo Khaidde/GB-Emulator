@@ -1,10 +1,19 @@
 #include "cpu.hpp"
 
+CPU::CPU(Memory& memory) : memory(&memory) {}
+
 void CPU::restart() {
-    AF.pair = 0x01B0;
-    BC.pair = 0x0013;
-    DE.pair = 0x00D8;
-    HL.pair = 0x014D;
+    if (memory->is_CGB()) {
+        AF.pair = 0x1180;
+        BC.pair = 0x0000;
+        DE.pair = 0x0008;
+        HL.pair = 0x007C;
+    } else {
+        AF.pair = 0x01B0;
+        BC.pair = 0x0013;
+        DE.pair = 0x00D8;
+        HL.pair = 0x014D;
+    }
     SP = 0xFFFE;
     PC = 0x0100;
     ime = false;

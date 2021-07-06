@@ -48,6 +48,8 @@ Cartridge::Cartridge(CartridgeInfo& info, const char* cartName, int maxRomBanks,
             printf("CGB Flag: also works on old gameboys\n");
         } else if (rom[0x143] == 0xC0) {
             printf("CGB Flag: only works on CGB\n");
+        } else {
+            // fatal("TODO implement DMG-mode on CGB");
         }
     } else {
         for (int c = 0x134; c < 0x144; c++) {
