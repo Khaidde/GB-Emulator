@@ -98,6 +98,8 @@ Cartridge::Cartridge(CartridgeInfo& info, const char* cartName, int maxRomBanks,
     if (numRamBanks > 0) {
         this->ramBanks = new RamBank[numRamBanks];
         this->activeRamBank = &ramBanks[0];
+    } else {
+        this->info.hasRam = false;
     }
 
 #if PLAYABLE

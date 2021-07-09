@@ -43,6 +43,7 @@ struct Fetcher {
     u8 windowY;
 
     u16 tileRowAddrOff;
+    u8 tileAttribs;
     u8 data0;
     u8 data1;
 };
@@ -147,6 +148,14 @@ private:
     u8* lyc;
     u8* wy;
     u8* wx;
+
+    bool bgAutoIncrement;
+    u8 bgPaletteIndex;
+    u8 bgPaletteData[64];  // 8 bytes per palette, 8 palettes
+
+    bool obAutoIncrement;
+    u8 obPaletteIndex;
+    u8 obPaletteData[64];
 
     static constexpr u16 OAM_START_ADDR = 0xFE00;
     u8* oamAddrBlock;

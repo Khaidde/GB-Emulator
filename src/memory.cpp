@@ -96,11 +96,9 @@ u8 Memory::read(u16 addr) {
     return mem[addr];
 }
 
-u8 Memory::read_vram(u16 addr) { return (*curVramBank)[addr]; }
+u8 Memory::read_cur_vram(u16 addr) { return (*curVramBank)[addr]; }
 
-u8 Memory::read_tile_map(u16 addr) { return vramBanks[0][addr]; }
-
-u8 Memory::read_tile_attrib(u16 addr) { return vramBanks[1][addr]; }
+u8 Memory::read_vram(bool vram1, u16 addr) { return vramBanks[vram1][addr]; }
 
 void Memory::write(u16 addr, u8 val) {
     if (addr < 0x8000 || (0xA000 <= addr && addr < 0xC000)) {
@@ -181,6 +179,10 @@ void Memory::write(u16 addr, u8 val) {
         case IOReg::LCDC_REG:
         case IOReg::STAT_REG:
         case IOReg::LYC_REG:
+        case IOReg::BGPI_REG:
+        case IOReg::BGPD_REG:
+        case IOReg::OBPI_REG:
+        case IOReg::OBPD_REG:
             ppu->write_register(addr, val);
             break;
         case IOReg::DMA_REG:

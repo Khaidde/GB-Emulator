@@ -60,7 +60,7 @@ Note: Build has only been tested on 64-bit Windows 10
 | Test         | Passed | Note            |
 | ------------ | :----: | --------------- |
 | cpu_instrs   |   x    |                 |
-| dmg_sound    |        | APU unimp       |
+| dmg_sound    |        |                 |
 | instr_timing |   x    |                 |
 | mem_timing   |   x    |                 |
 | mem_timing_2 |   x    |                 |
@@ -91,11 +91,11 @@ Note: Build has only been tested on 64-bit Windows 10
 
 ### oam_dma
 
-| Test       | Passed | Note           |
-| ---------- | :----: | -------------- |
-| basic      |   x    |                |
-| reg_read   |   x    |                |
-| sources-GS |        | unhandled case |
+| Test       | Passed | Note      |
+| ---------- | :----: | --------- |
+| basic      |   x    |           |
+| reg_read   |   x    |           |
+| sources-GS |        | Unhandled |
 
 ### ppu
 
@@ -108,8 +108,8 @@ Note: Build has only been tested on 64-bit Windows 10
 | intr_2_mode0_timing_sprites |        | test #00 failed |
 | intr_2_mode3_timing         |   x    |                 |
 | intr_2_oam_ok_timing        |   x    |                 |
-| lcdon_timing-GS             |        |                 |
-| lcdon_write_timing-GS       |        |                 |
+| lcdon_timing-GS             |   x    |                 |
+| lcdon_write_timing-GS       |   x    |                 |
 | stat_irq_blocking           |   x    |                 |
 | stat_lyc_onoff              |        |                 |
 | vblank_stat_intr-GS         |   x    |                 |

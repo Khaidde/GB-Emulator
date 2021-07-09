@@ -31,6 +31,9 @@ void PPU::restart() {
         (frameBuffers[1])[i] = BLANK_COLOR;
     }
 
+    bgAutoIncrement = true;
+    bgPaletteIndex = 0;
+
     line = 0x99;
     curPPUState = PPUState::V_BLANK;
     clockCnt = 56;  // initial drawn clocks at PC=0x100 (DMG)
@@ -91,6 +94,26 @@ void PPU::write_register(u16 addr, u8 val) {
             update_coincidence();
             try_lyc_intr();
             try_trigger_stat();
+            break;
+        case IOReg::BGPI_REG:
+            bgAutoIncrement = val & (1 << 7);
+            bgPaletteIndex = val & 0x3F;
+            break;
+        case IOReg::BGPD_REG:
+            bgPaletteData[bgPaletteIndex] = val;
+            if (bgAutoIncrement) {
+                bgPaletteIndex = (bgPaletteIndex + 1) & 0x3F;
+            }
+            break;
+        case IOReg::OBPI_REG:
+            obAutoIncrement = val & (1 << 7);
+            obPaletteIndex = val & 0x3F;
+            break;
+        case IOReg::OBPD_REG:
+            obPaletteData[obPaletteIndex] = val;
+            if (obAutoIncrement) {
+                obPaletteIndex = (obPaletteIndex + 1) & 0x3F;
+            }
             break;
     }
 }
@@ -410,6 +433,7 @@ void PPU::handle_pixel_render() {
         }
     }
     if (bgFifo.size > 0) {
+        bool isOBJPxl = false;
         FIFOData bgPxl = bgFifo.pop_head();
         u8 colIndex = bgPxl.colIndex;
         u8 paletteNum = bgPxl.paletteNum;
@@ -419,16 +443,35 @@ void PPU::handle_pixel_render() {
                 if (!spritePxl.bgPriority || colIndex == 0) {
                     colIndex = spritePxl.colIndex;
                     paletteNum = spritePxl.paletteNum;
+                    isOBJPxl = true;
                 }
             }
         }
 
         if (curPixelX >= 0) {
-            u8 i = (colIndex & 0x3) << 1;
-            u8 mask = 3 << i;
-            u8 palette = memory->read(IOReg::BGP_REG + paletteNum);
-            u32 col = baseColors[(palette & mask) >> i];
-            frameBuffers[bufferSel][line * Constants::WIDTH + curPixelX] = col;
+            if (memory->is_CGB()) {
+                u8* paletteData = bgPaletteData;
+                if (isOBJPxl) {
+                    paletteData = obPaletteData;
+                }
+                u8 index = colIndex * 2 + 8 * paletteNum;
+                u8 colLo = paletteData[index];
+                u8 colHi = paletteData[index + 1];
+                u8 r = colLo & 0x1F;
+                u8 g = ((colHi & 3) << 3) | ((colLo & 0xE0) >> 5);
+                u8 b = (colHi & 0x7C) >> 2;
+                r *= 0x100 / 0x20;
+                g *= 0x100 / 0x20;
+                b *= 0x100 / 0x20;
+                frameBuffers[bufferSel][line * Constants::WIDTH + curPixelX] =
+                    0xFF000000 | (u32)(r << 0x10) | (u32)(g << 0x8) | b;
+            } else {
+                u8 i = (colIndex & 0x3) << 1;
+                u8 mask = 3 << i;
+                u8 palette = memory->read(IOReg::BGP_REG + paletteNum);
+                u32 col = baseColors[(palette & mask) >> i];
+                frameBuffers[bufferSel][line * Constants::WIDTH + curPixelX] = col;
+            }
         }
         if (line == 130) {
             // printf("---%d\n", curPixelX);
@@ -462,26 +505,36 @@ void PPU::background_fetch() {
             u8 tileY = (yOff / TILE_PX_SIZE) % TILESET_SIZE;
 
             u16 tileIndexAddr = (tileX + tileY * TILESET_SIZE) + tileMap;
-            s8 tileIndex = (s8)memory->read_tile_map(tileIndexAddr);
-
+            s8 tileIndex = (s8)memory->read_vram(0, tileIndexAddr);
             u8 tileByteOff = (yOff % TILE_PX_SIZE) * 2;
-
             if (get_lcdc_flag(LCDCFlag::TILE_DATA_SELECT)) {
                 fetcher.tileRowAddrOff = (u8)tileIndex * TILE_MEM_LEN + tileByteOff;
             } else {
                 fetcher.tileRowAddrOff = (u16)(0x1000 + tileIndex * TILE_MEM_LEN + tileByteOff);
             }
+
+            if (memory->is_CGB()) {
+                fetcher.tileAttribs = memory->read_vram(1, tileIndexAddr);
+            }
             // if (line == 130) printf("b-%d\n", ppuClocks);
         } break;
         case Fetcher::READ_TILE_0:
-            fetcher.data0 = memory->read_vram(fetcher.tileRowAddrOff);
+            fetcher.data0 = memory->read_vram(fetcher.tileAttribs & 0x8 && memory->is_CGB(),
+                                              fetcher.tileRowAddrOff);
             // if (line == 130) printf("0-%d\n", ppuClocks);
             break;
         case Fetcher::READ_TILE_1:
-            fetcher.data1 = memory->read_vram(fetcher.tileRowAddrOff + 1);
+            fetcher.data1 = memory->read_vram(fetcher.tileAttribs & 0x8 && memory->is_CGB(),
+                                              fetcher.tileRowAddrOff + 1);
             // if (line == 130) printf("1-%d\n", ppuClocks);
         case Fetcher::PUSH:
             if (bgFifo.size == 0) {
+                u8 palette;
+                if (memory->is_CGB()) {
+                    palette = fetcher.tileAttribs & 0x7;
+                } else {
+                    palette = DMGPalette::BGP;
+                }
                 if (get_lcdc_flag(LCDCFlag::BG_WINDOW_ENABLE)) {
                     for (int i = 0; i < TILE_PX_SIZE; i++) {
                         u8 align = (1 << 7) >> i;
@@ -489,11 +542,11 @@ void PPU::background_fetch() {
                         bool hi = fetcher.data1 & align;
                         bool lo = fetcher.data0 & align;
                         u8 col = (hi << 1) | lo;
-                        bgFifo.push_tail({col, DMGPalette::BGP, false});
+                        bgFifo.push_tail({col, palette, false});
                     }
                 } else {
                     for (int i = 0; i < TILE_PX_SIZE; i++) {
-                        bgFifo.push_tail({0, DMGPalette::BGP, false});
+                        bgFifo.push_tail({0, palette, false});
                     }
                 }
                 fetcher.tileX++;
@@ -529,13 +582,20 @@ void PPU::sprite_fetch() {
             }
         } break;
         case Fetcher::READ_TILE_0:
-            fetcher.data0 = memory->read_vram(fetcher.tileRowAddrOff);
+            fetcher.data0 = memory->read_vram(fetcher.curSprite->flags & 0x8 && memory->is_CGB(),
+                                              fetcher.tileRowAddrOff);
             break;
         case Fetcher::READ_TILE_1:
-            fetcher.data1 = memory->read_vram(fetcher.tileRowAddrOff + 1);
+            fetcher.data1 = memory->read_vram(fetcher.curSprite->flags & 0x8 && memory->is_CGB(),
+                                              fetcher.tileRowAddrOff + 1);
         case Fetcher::PUSH: {
             bool bgPriority = fetcher.curSprite->flags & (1 << 7);
-            u8 palette = ((fetcher.curSprite->flags & (1 << 4)) != 0) + DMGPalette::OBP0;
+            u8 palette;
+            if (memory->is_CGB()) {
+                palette = fetcher.curSprite->flags & 0x7;
+            } else {
+                palette = ((fetcher.curSprite->flags & (1 << 4)) != 0) + DMGPalette::OBP0;
+            }
             bool xFlip = fetcher.curSprite->flags & (1 << 5);
             u8 fifoSize = spriteFifo.size;
             for (int i = 0; i < TILE_PX_SIZE; i++) {

@@ -42,9 +42,8 @@ public:
 
     u8& ref(u16 addr);
     u8 read(u16 addr);
-    u8 read_vram(u16 addr);
-    u8 read_tile_map(u16 addr);
-    u8 read_tile_attrib(u16 addr);
+    u8 read_cur_vram(u16 addr);
+    u8 read_vram(bool vram1, u16 addr);
     void write(u16 addr, u8 val);
 
     void schedule_read(u16 addr, u8* dest, u8 cycle);
