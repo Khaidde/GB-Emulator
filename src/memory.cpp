@@ -186,8 +186,9 @@ void Memory::write(u16 addr, u8 val) {
             ppu->write_register(addr, val);
             break;
         case IOReg::DMA_REG:
-            if (val >= 0xFE) {
-                fatal("TODO illegal DMA source value: %02x\n", val);
+            if (val >= 0xE0) {
+                // TODO verify this. According to docs, val >= 0xE0 is undefined behavior
+                val &= ~0x20;
             }
             scheduleDma = true;
             dmaStartAddr = val << 8;

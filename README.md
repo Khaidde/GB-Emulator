@@ -91,11 +91,11 @@ Note: Build has only been tested on 64-bit Windows 10
 
 ### oam_dma
 
-| Test       | Passed | Note      |
-| ---------- | :----: | --------- |
-| basic      |   x    |           |
-| reg_read   |   x    |           |
-| sources-GS |        | Unhandled |
+| Test       | Passed | Note |
+| ---------- | :----: | ---- |
+| basic      |   x    |      |
+| reg_read   |   x    |      |
+| sources-GS |   x    |      |
 
 ### ppu
 

@@ -86,7 +86,6 @@ int main(int argc, char** argv) {
                                                            // "mooneye-gb_hwtests\\emulator-only",
                                                            "mooneye-gb_hwtests\\misc"};
             const std::vector<std::string> excludeList = {
-                "oam_dma",
                 "multicart_rom_8Mb.gb",
             };
 
