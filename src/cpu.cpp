@@ -86,7 +86,6 @@ void CPU::emulate_cycle() {
         // if (memory->read(IOReg::LYC_REG) == 0x01) {
         // PAUSE_EXEC(this, debugger, 0x4950);
         // }
-        // PAUSE_EXEC(this, debugger, 0x47F3);
     }
 
     if (callbackCycle > 0) {

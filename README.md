@@ -111,7 +111,7 @@ Note: Build has only been tested on 64-bit Windows 10
 | lcdon_timing-GS             |   x    |                 |
 | lcdon_write_timing-GS       |   x    |                 |
 | stat_irq_blocking           |   x    |                 |
-| stat_lyc_onoff              |        |                 |
+| stat_lyc_onoff              |   x    |                 |
 | vblank_stat_intr-GS         |   x    |                 |
 
 ### acceptance

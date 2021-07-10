@@ -59,17 +59,18 @@ void PPU::write_register(u16 addr, u8 val) {
                 // immediately
                 lineClocks = 4;  // Hack to enable correct lcd on timing
                 clockCnt = OAM_SEARCH_CLOCKS - 4;
+
+                if (!(*stat & 0x4) && (*ly == *lyc)) {
+                    // only trigger lyc intr on rising edge of coincidence when enabling lcd
+                    try_lyc_intr();
+                    try_trigger_stat();
+                }
                 update_coincidence();
-                try_lyc_intr();
-                try_trigger_stat();
             } else if (!lcdOn && get_lcdc_flag(LCDCFlag::LCD_ENABLE)) {
                 *stat = (*stat & 0xFC) | 0;
                 *ly = 0;
                 line = 0;
-                update_coincidence();
                 statIntrFlags = 0;
-                try_lyc_intr();
-                try_trigger_stat();
 
                 oamBlockRead = false;
                 oamBlockWrite = false;
@@ -91,9 +92,11 @@ void PPU::write_register(u16 addr, u8 val) {
         } break;
         case IOReg::LYC_REG:
             *lyc = val;
-            update_coincidence();
-            try_lyc_intr();
-            try_trigger_stat();
+            if (get_lcdc_flag(LCDCFlag::LCD_ENABLE)) {
+                update_coincidence();
+                try_lyc_intr();
+                try_trigger_stat();
+            }
             break;
         case IOReg::BGPI_REG:
             bgAutoIncrement = val & (1 << 7);
