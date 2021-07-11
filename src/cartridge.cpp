@@ -202,7 +202,9 @@ u8 Cartridge::read_ram(u16 addr) {
 ROMOnly::ROMOnly(CartridgeInfo& info, u8* rom) : Cartridge(info, "ROM Only", 2, 0, rom) {}
 
 void ROMOnly::write(u16 addr, u8 val) {
+#if PLAYABLE
     printf("Warning: Attempting to write to rom only cartridge, addr=%02x val=%02x.\n", addr, val);
+#endif
 }
 
 MBC1::MBC1(CartridgeInfo& info, u8* rom) : Cartridge(info, "MBC1", 128, 4, rom) {}

@@ -85,9 +85,9 @@ Note: Build has only been tested on 64-bit Windows 10
 
 ### interrupts
 
-| Test    | Passed | Note      |
-| ------- | :----: | --------- |
-| ie_push |        | Unhandled |
+| Test    | Passed | Note |
+| ------- | :----: | ---- |
+| ie_push |   x    |      |
 
 ### oam_dma
 

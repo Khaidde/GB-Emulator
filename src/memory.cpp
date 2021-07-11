@@ -50,9 +50,7 @@ void Memory::restart() {
     reset_cycles();
 }
 
-void Memory::request_interrupt(Interrupt interrupt) {
-    write(IOReg::IF_REG, read(IOReg::IF_REG) | (u8)interrupt);
-}
+void Memory::request_interrupt(Interrupt interrupt) { mem[IOReg::IF_REG] |= (u8)interrupt; }
 
 u8& Memory::ref(u16 addr) { return mem[addr]; }
 

@@ -17,8 +17,8 @@ void Debugger::print_info() {
     printf(" => %04x (PC)\n", cpu->PC);
     printf("\tZNHC=%d%d%d%d\n", cpu->check_flag(CPU::Z_FLAG), cpu->check_flag(CPU::N_FLAG),
            cpu->check_flag(CPU::H_FLAG), cpu->check_flag(CPU::C_FLAG));
-    printf("\tAF=%04x BC=%04x DE=%04x HL=%04x SP=%04x\n", cpu->AF.pair, cpu->BC.pair, cpu->DE.pair,
-           cpu->HL.pair, cpu->SP);
+    printf("\tAF=%04x BC=%04x DE=%04x HL=%04x SP=%04x\n", cpu->regs.AF, cpu->regs.BC, cpu->regs.DE,
+           cpu->regs.HL, cpu->SP);
     printf("\time=%d if=%02x ie=%02x\n", cpu->ime, memory->read(IOReg::IF_REG),
            memory->read(IOReg::IE_REG));
     printf("\tly=%02x lcdc=%02x stat=%02x\n", memory->read(IOReg::LY_REG),
@@ -58,9 +58,9 @@ bool Debugger::can_step() {
 }
 
 bool Debugger::check_fib_in_registers() {
-    if (cpu->BC.hi == 3 && cpu->BC.lo == 5) {
-        if (cpu->DE.hi == 8 && cpu->DE.lo == 13) {
-            if (cpu->HL.hi == 21 && cpu->HL.lo == 34) {
+    if (cpu->regs.B == 3 && cpu->regs.C == 5) {
+        if (cpu->regs.D == 8 && cpu->regs.E == 13) {
+            if (cpu->regs.H == 21 && cpu->regs.L == 34) {
                 return true;
             }
         }

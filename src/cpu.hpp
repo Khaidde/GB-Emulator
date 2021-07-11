@@ -7,14 +7,6 @@
 class Memory;
 class Debugger;
 
-union RegPair {
-    struct {
-        u8 lo;
-        u8 hi;
-    };
-    u16 pair;
-};
-
 class CPU {
 public:
     CPU(Memory& memory);
@@ -31,10 +23,23 @@ private:
 
     Memory* memory;
 
-    RegPair AF;
-    RegPair BC;
-    RegPair DE;
-    RegPair HL;
+    // clang-format off
+    union {
+        struct {
+            u16 AF;
+            u16 BC;
+            u16 DE;
+            u16 HL;
+        };
+        // TODO only works on little-endian machines
+        struct {
+            u8 F; u8 A;
+            u8 C; u8 B;
+            u8 E; u8 D;
+            u8 L; u8 H;
+        };
+    } regs;
+    // clang-format on
 
     u16 SP;
     u16 PC;
