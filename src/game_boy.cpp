@@ -104,14 +104,16 @@ void GameBoy::emulate_frame() {
         }
 
         memory.emulate_dma_cycle();
+        for (int i = 0; i < 4; i++) {
+            timer.emulate_clock();
+            apu.emulate_clock();
+        }
         if (cpu.is_fetching()) {
             memory.reset_cycles();
             cpu.handle_interrupts();  // Interrupts are checked before fetching a new instruction
         }
         for (int i = 0; i < 4; i++) {
-            timer.emulate_clock();
             ppu.emulate_clock();
-            apu.emulate_clock();
         }
         cpu.emulate_cycle();
         memory.emulate_cycle();

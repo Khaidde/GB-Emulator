@@ -5,6 +5,7 @@
 Timer::Timer(Memory& memory) : memory(&memory) {
     div = &memory.ref(IOReg::DIV_REG);
     tima = &memory.ref(IOReg::TIMA_REG);
+    tma = &memory.ref(IOReg::TMA_REG);
 }
 
 void Timer::restart() {
@@ -17,27 +18,41 @@ void Timer::restart() {
         clocks = 0xABCC;
         // 0xABCC <= clocks <= 0xABD0
     }
-    timaScheduled = false;
+    timaScheduleCnt = 0;
 
     oldBitSet = false;
 
-    enabled = false;
-    set_frequency(0);
+    timaWrote = false;
+    timaReloaded = false;
+
+    write_tac(0xF8);
 }
 
 void Timer::emulate_clock() {
     clocks++;
 
-    if (timaScheduled) {
-        memory->write(IOReg::TIMA_REG, memory->read(IOReg::TMA_REG));
-        memory->request_interrupt(Interrupt::TIMER_INT);
-        timaScheduled = false;
+    if (timaReloaded) {
+        timaReloaded = false;
+    }
+    if (timaScheduleCnt > 0) {
+        timaScheduleCnt--;
+        if (timaScheduleCnt == 0) {
+            if (timaWrote) {
+                timaWrote = false;
+            } else {
+                *tima = *tma;
+                memory->request_interrupt(Interrupt::TIMER_INT);
+                timaReloaded = true;
+            }
+        }
     }
 
     bool newBitSet = (clocks >> bitFreq) & enabled;
     if (!newBitSet && oldBitSet) {
         (*tima)++;
-        if (memory->read(IOReg::TIMA_REG) == 0) timaScheduled = true;
+        if (*tima == 0) {
+            timaScheduleCnt = 4;
+        }
     }
     oldBitSet = newBitSet;
 
@@ -48,9 +63,25 @@ void Timer::reset_div() {
     *div = 0;
     clocks = 0;
 }
-void Timer::set_enable(bool isEnabled) { this->enabled = isEnabled; }
 
-void Timer::set_frequency(u8 mode) {
-    static constexpr u8 freqList[4] = {9, 3, 5, 7};
-    bitFreq = freqList[mode];
+void Timer::write_tima(u8 newTima) {
+    if (timaScheduleCnt > 0) {
+        timaWrote = true;
+    }
+    if (!timaReloaded) {
+        *tima = newTima;
+    }
+}
+
+void Timer::write_tma(u8 newTma) {
+    *tma = newTma;
+    if (timaReloaded) {
+        *tima = *tma;
+    }
+}
+
+static constexpr u8 freqList[4] = {9, 3, 5, 7};
+void Timer::write_tac(u8 newTac) {
+    bitFreq = freqList[newTac & 0x3];
+    this->enabled = (newTac & 0x4) != 0;
 }

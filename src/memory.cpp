@@ -166,10 +166,15 @@ void Memory::write(u16 addr, u8 val) {
         case IOReg::DIV_REG:
             timer->reset_div();
             break;
+        case IOReg::TIMA_REG:
+            timer->write_tima(val);
+            break;
+        case IOReg::TMA_REG:
+            timer->write_tma(val);
+            break;
         case IOReg::TAC_REG:
-            timer->set_enable((val >> 2) & 0x1);
-            timer->set_frequency(val & 0x3);
-            mem[addr] = 0xF8 | (val & 0x7);
+            timer->write_tac(val);
+            mem[addr] = 0xF8 | val;
             break;
         case IOReg::IF_REG:
             mem[addr] = 0xE0 | (val & 0x1F);

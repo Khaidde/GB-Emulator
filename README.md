@@ -114,6 +114,24 @@ Note: Build has only been tested on 64-bit Windows 10
 | stat_lyc_onoff              |   x    |                 |
 | vblank_stat_intr-GS         |   x    |                 |
 
+### timer
+
+| Test                 | Passed | Note |
+| -------------------- | :----: | ---- |
+| div_write            |   x    |      |
+| rapid_toggle         |   x    |      |
+| tim00                |   x    |      |
+| tim00_div_trigger    |   x    |      |
+| tim01                |   x    |      |
+| tim01_div_trigger    |   x    |      |
+| tim10                |   x    |      |
+| tim10_div_trigger    |   x    |      |
+| tim11                |   x    |      |
+| tim11_div_trigger    |   x    |      |
+| tima_reload          |   x    |      |
+| tima_write_reloading |   x    |      |
+| tma_write_reloading  |   x    |      |
+
 ### acceptance
 
 | Test                    | Passed | Note |
