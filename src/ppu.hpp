@@ -6,6 +6,7 @@ class Memory;
 class Debugger;
 
 struct Sprite {
+    u8 oamIndex;
     u8 y;
     u8 x;
     u8 tileID;
@@ -42,7 +43,8 @@ struct Fetcher {
     bool windowXEnable;
     u8 windowY;
 
-    u16 tileByteAddr;
+    u8 tileIndex;
+    u16 yOff;
     u8 tileAttribs;
     u8 data0;
     u8 data1;
@@ -53,14 +55,20 @@ enum DMGPalette : u8 {
     OBP0 = 1,
     OBP1 = 2,
 };
-struct FIFOData {
+struct BGFIFOData {
     u8 colIndex;
     u8 paletteNum;
-    bool bgPriority;
+    bool priority;
+};
+struct SpriteFIFOData {
+    u8 colIndex;
+    u8 paletteNum;
+    bool priority;
+    u8 oamIndex;
 };
 
 enum class LCDCFlag : u8 {
-    BG_WINDOW_ENABLE = 0,
+    BG_WINDOW_OR_PRIORITY_ENABLE = 0,
     SPRITE_ENABLE = 1,
     SPRITE_SIZE = 2,
     BG_TILE_SELECT = 3,
@@ -185,8 +193,8 @@ private:
     Fetcher fetcher;
 
     static constexpr u8 FIFO_SIZE = 16;
-    Queue<FIFOData, FIFO_SIZE> bgFifo;
-    Queue<FIFOData, FIFO_SIZE> spriteFifo;
+    Queue<BGFIFOData, FIFO_SIZE> bgFifo;
+    Queue<SpriteFIFOData, FIFO_SIZE> spriteFifo;
 
     u8 lockedSCX;
 

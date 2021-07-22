@@ -5,8 +5,12 @@ A Gameboy/Gameboy Color emulator aimed at accuracy. This project is meant to be 
 # TODO
 
 -   OAM bug
+-   WX=167,00
 -   MBC3
--   Support CGB (Gameboy Color)
+-   Serial
+-   HDMA
+-   Double speed mode
+-   Infared sensor
 -   Command-line parser
 
 # Build
