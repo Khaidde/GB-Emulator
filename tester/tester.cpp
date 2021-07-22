@@ -81,10 +81,14 @@ int main(int argc, char** argv) {
     gameboy.set_debugger(debugger);
     try {
         if (argc == 1) {
-            const std::vector<std::string> testRomPaths = {"mooneye-gb_hwtests\\acceptance",
-                                                           // "mooneye-gb_hwtests\\acceptance\\ppu",
-                                                           // "mooneye-gb_hwtests\\emulator-only",
-                                                           "mooneye-gb_hwtests\\misc"};
+            const std::vector<std::string> testRomPaths = {
+                // "SameSuite",
+                "mooneye-gb_hwtests\\acceptance",
+                // "mooneye-gb_hwtests\\acceptance\\ppu",
+                // "mooneye-gb_hwtests\\emulator-only",
+                "mooneye-gb_hwtests\\misc",
+                // "wilbertpol",
+            };
             const std::vector<std::string> excludeList = {
                 "multicart_rom_8Mb.gb",
             };

@@ -3,11 +3,11 @@
 #include <fstream>
 #include <vector>
 
-GameBoy::GameBoy() : cpu(memory), input(memory), timer(memory), ppu(memory), apu(memory) {
+GameBoy::GameBoy() : cpu(memory), input(memory), timer(memory), apu(memory), ppu(memory) {
     memory.set_input(input);
     memory.set_timer(timer);
-    memory.set_ppu(ppu);
     memory.set_apu(apu);
+    memory.set_ppu(ppu);
 }
 
 namespace {
@@ -87,39 +87,26 @@ void GameBoy::load(const char* romPath) {
 
 void GameBoy::set_debugger(Debugger& debugger) {
     this->debugger = &debugger;
-    debugger.init(&cpu, &ppu, &memory);
+    debugger.init(&cpu, &memory);
 
     cpu.set_debugger(debugger);
     memory.set_debugger(debugger);
     ppu.set_debugger(debugger);
+    timer.set_debugger(debugger);
 }
 
 void GameBoy::emulate_frame() {
-    while (totalTCycles < PPU::TOTAL_CLOCKS) {
-        if (cpu.is_fetching() && debugger->is_paused() && !debugger->can_step()) {
+    bool frameElapsed = true;
+    while (memory.get_elapsed_cycles() < PPU::TOTAL_CLOCKS) {
+        if (debugger->is_paused() && !debugger->can_step()) {
+            frameElapsed = false;
             break;
         }
-        if (cpu.is_fetching() && debugger->is_paused()) {
-            printf("---------------\n");
-        }
-
-        memory.emulate_dma_cycle();
-        for (int i = 0; i < 4; i++) {
-            timer.emulate_clock();
-            apu.emulate_clock();
-        }
-        if (cpu.is_fetching()) {
-            memory.reset_cycles();
-            cpu.handle_interrupts();  // Interrupts are checked before fetching a new instruction
-        }
-        for (int i = 0; i < 4; i++) {
-            ppu.emulate_clock();
-        }
-        cpu.emulate_cycle();
-        memory.emulate_cycle();
-        totalTCycles += 4;
+        cpu.fetch_execute();
     }
-    totalTCycles -= PPU::TOTAL_CLOCKS;
+    if (frameElapsed) {
+        memory.reset_elapsed_cycles();
+    }
 }
 
 void GameBoy::emulate_frame(u32* screenBuffer, s16* sampleBuffer, u16 sampleLen) {

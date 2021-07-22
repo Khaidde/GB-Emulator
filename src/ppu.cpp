@@ -34,9 +34,12 @@ void PPU::restart() {
     bgAutoIncrement = true;
     bgPaletteIndex = 0;
 
+    curVramBank = &tileMapVram;
+
     line = 0x99;
     curPPUState = PPUState::V_BLANK;
-    clockCnt = 56;  // initial drawn clocks at PC=0x100 (DMG)
+    // initial drawn clocks at PC=0x100 with 1 cycle cpu prefetch accounted for (DMG)
+    clockCnt = 56;
     lineClocks = 400;
 
     oamBlockRead = false;
@@ -121,18 +124,37 @@ void PPU::write_register(u16 addr, u8 val) {
     }
 }
 
+void PPU::write_vbk(u8 val) { curVramBank = (val == 0) ? &tileMapVram : &tileAttribVram; }
+
+void PPU::write_vram(u16 addr, u8 val) {
+    if (0x8000 <= addr && addr < 0xA000) {
+        if (!vramBlockWrite) {
+            (*curVramBank)[addr - 0x8000] = val;
+        }
+    } else {
+        fatal("Invalid VRAM write address: %04x\n", addr);
+    }
+}
+
+u8 PPU::read_vram(u16 addr) {
+    if (0x8000 <= addr && addr < 0xA000) {
+        if (vramBlockRead) {
+            return 0xFF;
+        }
+        return (*curVramBank)[addr - 0x8000];
+    } else {
+        fatal("Invalid VRAM read address: %04x\n", addr);
+    }
+}
+
 bool PPU::is_oam_read_blocked() { return oamBlockRead; }
 
 bool PPU::is_oam_write_blocked() { return oamBlockWrite; }
 
-bool PPU::is_vram_read_blocked() { return vramBlockRead; }
-
-bool PPU::is_vram_write_blocked() { return vramBlockWrite; }
-
 void PPU::render(u32* pixelBuffer) {
     FrameBuffer* curBuffer = &frameBuffers[!bufferSel];
     for (int i = 0; i < Constants::WIDTH * Constants::HEIGHT; i++) {
-        pixelBuffer[i] = get_lcdc_flag(LCDCFlag::LCD_ENABLE) ? (*curBuffer)[i] : BLANK_COLOR;
+        pixelBuffer[i] = (*curBuffer)[i];
     }
 }
 
@@ -452,6 +474,7 @@ void PPU::handle_pixel_render() {
         }
 
         if (curPixelX >= 0) {
+            u32 col;
             if (memory->is_CGB()) {
                 u8* paletteData = bgPaletteData;
                 if (isOBJPxl) {
@@ -466,18 +489,14 @@ void PPU::handle_pixel_render() {
                 r *= 0x100 / 0x20;
                 g *= 0x100 / 0x20;
                 b *= 0x100 / 0x20;
-                frameBuffers[bufferSel][line * Constants::WIDTH + curPixelX] =
-                    0xFF000000 | (u32)(r << 0x10) | (u32)(g << 0x8) | b;
+                col = 0xFF000000 | (u32)(r << 0x10) | (u32)(g << 0x8) | b;
             } else {
                 u8 i = (colIndex & 0x3) << 1;
                 u8 mask = 3 << i;
                 u8 palette = memory->read(IOReg::BGP_REG + paletteNum);
-                u32 col = baseColors[(palette & mask) >> i];
-                frameBuffers[bufferSel][line * Constants::WIDTH + curPixelX] = col;
+                col = baseColors[(palette & mask) >> i];
             }
-        }
-        if (line == 130) {
-            // printf("---%d\n", curPixelX);
+            frameBuffers[bufferSel][line * Constants::WIDTH + curPixelX] = col;
         }
         curPixelX++;
     }
@@ -508,28 +527,28 @@ void PPU::background_fetch() {
             u8 tileY = (yOff / TILE_PX_SIZE) % TILESET_SIZE;
 
             u16 tileIndexAddr = (tileX + tileY * TILESET_SIZE) + tileMap;
-            s8 tileIndex = (s8)memory->read_vram(0, tileIndexAddr);
-            u8 tileByteOff = (yOff % TILE_PX_SIZE) * 2;
+
+            u8 tileIndex = tileMapVram[tileIndexAddr];
+            u8 tileByteOff = (yOff % TILE_PX_SIZE) << 1;
             if (get_lcdc_flag(LCDCFlag::TILE_DATA_SELECT)) {
-                fetcher.tileRowAddrOff = (u8)tileIndex * TILE_MEM_LEN + tileByteOff;
+                fetcher.tileByteAddr = tileIndex * TILE_MEM_LEN + tileByteOff;
             } else {
-                fetcher.tileRowAddrOff = (u16)(0x1000 + tileIndex * TILE_MEM_LEN + tileByteOff);
+                fetcher.tileByteAddr = (u16)(0x1000 + (s8)tileIndex * TILE_MEM_LEN + tileByteOff);
             }
 
             if (memory->is_CGB()) {
-                fetcher.tileAttribs = memory->read_vram(1, tileIndexAddr);
+                fetcher.tileAttribs = tileAttribVram[tileIndexAddr];
             }
-            // if (line == 130) printf("b-%d\n", ppuClocks);
         } break;
         case Fetcher::READ_TILE_0:
-            fetcher.data0 = memory->read_vram(fetcher.tileAttribs & 0x8 && memory->is_CGB(),
-                                              fetcher.tileRowAddrOff);
-            // if (line == 130) printf("0-%d\n", ppuClocks);
+            fetcher.data0 = ((fetcher.tileAttribs & 0x8 && memory->is_CGB())
+                                 ? tileAttribVram
+                                 : tileMapVram)[fetcher.tileByteAddr];
             break;
         case Fetcher::READ_TILE_1:
-            fetcher.data1 = memory->read_vram(fetcher.tileAttribs & 0x8 && memory->is_CGB(),
-                                              fetcher.tileRowAddrOff + 1);
-            // if (line == 130) printf("1-%d\n", ppuClocks);
+            fetcher.data1 = ((fetcher.tileAttribs & 0x8 && memory->is_CGB())
+                                 ? tileAttribVram
+                                 : tileMapVram)[fetcher.tileByteAddr + 1];
         case Fetcher::PUSH:
             if (bgFifo.size == 0) {
                 u8 palette;
@@ -554,15 +573,9 @@ void PPU::background_fetch() {
                 }
                 fetcher.tileX++;
                 fetcher.curFetchState = 7;
-                if (line == 130) {
-                    // printf("push-%d\n", ppuClocks);
-                }
             }
             break;
         case Fetcher::SLEEP:
-            if (line == 130) {
-                // printf("sleep-%d\n", ppuClocks);
-            }
             break;
     }
 }
@@ -577,20 +590,22 @@ void PPU::sprite_fetch() {
 
             u8 yMask = get_lcdc_flag(LCDCFlag::SPRITE_SIZE) ? 0xF : 0x7;
             u8 tileY = (line - fetcher.curSprite->y) & yMask;
-            fetcher.tileRowAddrOff = tileIndex * TILE_MEM_LEN;
+            fetcher.tileByteAddr = tileIndex * TILE_MEM_LEN;
             if (fetcher.curSprite->flags & (1 << 6)) {
-                fetcher.tileRowAddrOff += (tileY ^ yMask) * 2;
+                fetcher.tileByteAddr += (tileY ^ yMask) << 1;
             } else {
-                fetcher.tileRowAddrOff += tileY * 2;
+                fetcher.tileByteAddr += tileY << 1;
             }
         } break;
         case Fetcher::READ_TILE_0:
-            fetcher.data0 = memory->read_vram(fetcher.curSprite->flags & 0x8 && memory->is_CGB(),
-                                              fetcher.tileRowAddrOff);
+            fetcher.data0 = ((fetcher.curSprite->flags & 0x8 && memory->is_CGB())
+                                 ? tileAttribVram
+                                 : tileMapVram)[fetcher.tileByteAddr];
             break;
         case Fetcher::READ_TILE_1:
-            fetcher.data1 = memory->read_vram(fetcher.curSprite->flags & 0x8 && memory->is_CGB(),
-                                              fetcher.tileRowAddrOff + 1);
+            fetcher.data1 = ((fetcher.curSprite->flags & 0x8 && memory->is_CGB())
+                                 ? tileAttribVram
+                                 : tileMapVram)[fetcher.tileByteAddr + 1];
         case Fetcher::PUSH: {
             bool bgPriority = fetcher.curSprite->flags & (1 << 7);
             u8 palette;

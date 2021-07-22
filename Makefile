@@ -40,7 +40,7 @@ ifeq (${BUILD_TYPE}, debug)
 CFLAGS += -g
 endif
 ifeq (${BUILD_TYPE}, release)
-CFLAGS += -O3
+CFLAGS += -O3 -DDEBUG=false
 endif
 
 TEST_BIN_DIR := tester/build/bin
@@ -86,11 +86,11 @@ ${TEST_BIN_DIR}/gbemu-tester.exe: ${TEST_OBJECTS}
 	$(call create_exe)
 
 ${TEST_OBJ_DIR}/tester.o: tester/tester.cpp
-	$(eval CFLAGS += -DPLAYABLE=false -I./src)
+	$(eval CFLAGS += -DLOG=false -I./src)
 	$(call build_objs)
 
 ${TEST_OBJ_DIR}/%.o: src/%.cpp
-	$(eval CFLAGS += -DPLAYABLE=false)
+	$(eval CFLAGS += -DLOG=false)
 	$(call build_objs)
 
 # Clean

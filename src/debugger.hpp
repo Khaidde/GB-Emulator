@@ -25,10 +25,11 @@ class Memory;
 
 class Debugger {
 public:
-    void init(CPU* cpu, PPU* ppu, Memory* memory);
+    void init(CPU* cpu, Memory* memory);
 
 private:
     void print_reg(u16 address, const char* name);
+    std::string disassemble(u16 pc);
 
 public:
     void print_info();

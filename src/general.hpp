@@ -9,8 +9,12 @@ using u32 = uint32_t;
 using s8 = int8_t;
 using s16 = int16_t;
 
-#ifndef PLAYABLE
-#define PLAYABLE true
+#ifndef DEBUG
+#define DEBUG true
+#endif
+
+#ifndef LOG
+#define LOG true
 #endif
 
 #define fatal(...)                                                                     \
@@ -48,7 +52,7 @@ constexpr int HEIGHT = 144;
 
 constexpr double MS_PER_FRAME = 16.7427;
 
-constexpr double MASTER_VOLUME = 2;
+constexpr double MASTER_VOLUME = 0.5;
 constexpr int SAMPLE_RATE = 48000;
 
 }  // namespace Constants

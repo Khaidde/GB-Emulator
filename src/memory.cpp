@@ -23,7 +23,6 @@ constexpr u8 CGB_BOOT_IO[] = {
 }  // namespace
 
 void Memory::restart() {
-    curVramBank = &vramBanks[0];
     curWramBank = &wramBanks[1];
 
     if (is_CGB()) {
@@ -46,8 +45,8 @@ void Memory::restart() {
     dmaInProgress = false;
     scheduleDma = false;
     dmaCycleCnt = 0;
-    scheduledMemoryOps.clear();
-    reset_cycles();
+
+    elapsedCycles = 0;
 }
 
 void Memory::request_interrupt(Interrupt interrupt) { mem[IOReg::IF_REG] |= (u8)interrupt; }
@@ -59,10 +58,7 @@ u8 Memory::read(u16 addr) {
         return cartridge->read_rom(addr);
     }
     if (addr < 0xA000) {
-        if (ppu->is_vram_read_blocked()) {
-            return 0xFF;
-        }
-        return (*curVramBank)[addr - 0x8000];
+        return ppu->read_vram(addr);
     }
     if (addr < 0xC000) {
         return cartridge->read_ram(addr);
@@ -94,19 +90,13 @@ u8 Memory::read(u16 addr) {
     return mem[addr];
 }
 
-u8 Memory::read_cur_vram(u16 addr) { return (*curVramBank)[addr]; }
-
-u8 Memory::read_vram(bool vram1, u16 addr) { return vramBanks[vram1][addr]; }
-
 void Memory::write(u16 addr, u8 val) {
     if (addr < 0x8000 || (0xA000 <= addr && addr < 0xC000)) {
         cartridge->write(addr, val);
         return;
     }
     if (0x8000 <= addr && addr < 0xA000) {
-        if (!ppu->is_vram_write_blocked()) {
-            (*curVramBank)[addr - 0x8000] = val;
-        }
+        ppu->write_vram(addr, val);
         return;
     }
     if (0xC000 <= addr && addr < 0xD000) {
@@ -126,7 +116,7 @@ void Memory::write(u16 addr, u8 val) {
             if (addr < 0xFEA0) {
                 return;  // TODO assuming that oam writes have no effect during dma
             } else {
-                fatal("Bad write to addr=%04x", addr);
+                fatal("TODO write to addr=%04x with undefined behavior", addr);
             }
         }
         if (ppu->is_oam_write_blocked()) {
@@ -155,7 +145,7 @@ void Memory::write(u16 addr, u8 val) {
             mem[addr] = 0xC0 | (val & 0x30) | (mem[addr] & 0x0F);
             break;
         case IOReg::SB_REG:
-#if PLAYABLE
+#if DEBUG && LOG
             printf("%c", val);
 #endif
             mem[addr] = val;
@@ -189,11 +179,11 @@ void Memory::write(u16 addr, u8 val) {
             ppu->write_register(addr, val);
             break;
         case IOReg::DMA_REG:
+            // TODO verify this. According to docs, val >= 0xE0 is undefined behavior
             if (val >= 0xE0) {
-                // TODO verify this. According to docs, val >= 0xE0 is undefined behavior
                 val &= ~0x20;
             }
-            scheduleDma = true;
+            scheduleDma = true;  // DMA idles for 1 cycle before starting
             dmaStartAddr = val << 8;
             mem[addr] = val;
             break;
@@ -202,7 +192,7 @@ void Memory::write(u16 addr, u8 val) {
         }
         case IOReg::VBK_REG:
             if (is_CGB()) {
-                curVramBank = &vramBanks[val & 0x1];
+                ppu->write_vbk(val);
                 mem[addr] = 0xFE | val;
             }
             break;
@@ -228,46 +218,34 @@ void Memory::write(u16 addr, u8 val) {
     }
 }
 
-void Memory::schedule_read(u16 addr, u8* dest, u8 cycle) {
-    scheduledMemoryOps.push_tail({cycle, addr, false, {dest}});
-}
-
-void Memory::schedule_write(u16 addr, u8* val, u8 cycle) {
-    scheduledMemoryOps.push_tail({cycle, addr, true, {val}});
-}
-
 void Memory::emulate_dma_cycle() {
+    if (dmaCycleCnt == 0) {
+        dmaInProgress = false;
+    }
     if (dmaCycleCnt > 0) {
-        if (dmaCycleCnt <= 160) {
-            u8 i = 160 - dmaCycleCnt;
-            mem[0xFE00 + i] = read(dmaStartAddr + i);
-            if (i == 0) {
-                dmaInProgress = true;
-            }
+        u8 i = 160 - dmaCycleCnt;
+        if (i == 0) {
+            dmaInProgress = true;
         }
+        mem[0xFE00 + i] = read(dmaStartAddr + i);
         dmaCycleCnt--;
-        if (dmaCycleCnt == 0) {
-            dmaInProgress = false;
-        }
     }
     if (scheduleDma) {
-        dmaCycleCnt = 160 + 1;  // DMA takes an extra cycle for initial setup
+        dmaCycleCnt = 160;  // DMA takes 160 cycles
         scheduleDma = false;
     }
 }
 
-void Memory::emulate_cycle() {
-    cycleCnt++;
-    if (scheduledMemoryOps.size > 0) {
-        if (scheduledMemoryOps.head().cycle == cycleCnt) {
-            MemoryOp memOp = scheduledMemoryOps.pop_head();
-            if (memOp.isWrite) {
-                write(memOp.addr, *memOp.writeVal);
-            } else {
-                *memOp.readDest = read(memOp.addr);
-            }
-        }
-    }
-}
+int Memory::get_elapsed_cycles() { return elapsedCycles; }
 
-void Memory::reset_cycles() { cycleCnt = 0; }
+void Memory::reset_elapsed_cycles() { elapsedCycles -= PPU::TOTAL_CLOCKS; }
+
+void Memory::sleep_cycle() {
+    emulate_dma_cycle();
+    for (int i = 0; i < 4; i++) {
+        timer->emulate_clock();
+        apu->emulate_clock();
+        ppu->emulate_clock();
+    }
+    elapsedCycles += 4;
+}

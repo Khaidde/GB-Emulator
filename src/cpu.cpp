@@ -20,10 +20,6 @@ void CPU::restart() {
     imeScheduled = false;
     halted = false;
     haltBug = false;
-
-    cycleCnt = 0;
-
-    callbackCycle = 0;
 }
 
 void CPU::handle_interrupts() {
@@ -37,32 +33,25 @@ void CPU::handle_interrupts() {
             for (int i = 0; i < 5; i++) {
                 if (interrupts & (1 << i)) {
                     ime = false;
-
-                    cycleCnt++;
+                    memory->sleep_cycle();
 
                     // TODO test if PC push is cut halfway (msb is written but lsb is not)
-                    static u8 msb;
-                    msb = PC >> 8;
-                    skd_write(--SP, msb);
-
+                    write(--SP, PC >> 8);
                     if (SP == 0xFFFF) {
                         u8 pushIE = PC >> 8;
                         if ((ifReg & pushIE & 0x1F & (1 << i)) == 0) {
                             PC = 0x0000;
-#if PLAYABLE
+#if LOG
                             printf("Info: ie push cancel ocurred\n");
 #endif
                             continue;
                         }
                     }
-                    static u8 lsb;
-                    lsb = PC & 0xFF;
-                    skd_write(--SP, lsb);
-                    PC = i * 0x8 + 0x40;
+                    write(--SP, PC & 0xFF);
+                    PC = (i << 3) + 0x40;
 
                     write(IOReg::IF_REG, ifReg & ~(1 << i));
-
-                    cycleCnt++;  // Interrupt handling takes total of 5 cycles (+1 if halted)
+                    memory->sleep_cycle();  // Interrupt handling takes total of 5 cycles
                     break;
                 }
             }
@@ -75,44 +64,29 @@ void CPU::handle_interrupts() {
     }
 }
 
-bool CPU::is_fetching() { return cycleCnt == 0; }
-
-void CPU::emulate_cycle() {
-    if (is_fetching()) {
-        if (debugger->is_paused()) {
-            debugger->print_info();
-        }
-
-        if (halted) {
-            return;
-        }
-
-        u8 op = n();
-        if (debugger->is_paused()) {
-            printf("fetch--%04x-%02x\n", PC - 1, op);
-        }
-
-        if (haltBug) {
-            PC--;
-            haltBug = false;
-        }
-        execute(op);
+void CPU::fetch_execute() {
+    memory->sleep_cycle();  // Sleep before handling interrupt to check for late interrupts
+    handle_interrupts();
+    if (halted) {
+        return;
     }
 
-    if (--cycleCnt == 0) {
-        // PAUSE_EXEC_OCC(this, debugger, 0x40, 3300);
-        // PAUSE_EXEC(this, debugger, 0x47F9);
-        // if (memory->read(IOReg::LYC_REG) == 0x01) {
-        // PAUSE_EXEC(this, debugger, 0x4950);
-        // }
-    }
+#if DEBUG && LOG
+    // if (regs.BC == 0xFFD9) {
+    // PAUSE_EXEC(this, debugger, 0x165);
+    // }
+    // PAUSE_EXEC(this, debugger, 0x48);
+#endif
 
-    if (callbackCycle > 0) {
-        callbackCycle--;
-        if (callbackCycle == 0) {
-            callback(this);
-        }
+    if (debugger->is_paused()) {
+        debugger->print_info();
     }
+    u8 op = memory->read(PC++);  // Compensate for memory sleep earlier
+    if (haltBug) {
+        PC--;
+        haltBug = false;
+    }
+    execute(op);
 }
 
 // clang-format off
@@ -138,25 +112,22 @@ void CPU::execute(u8 opcode) {
         case 0x22: write(regs.HL++, regs.A); break; // LD (HL+), A
         case 0x32: write(regs.HL--, regs.A); break; // LD (HL-), A
         // LD reg8, n
-        case 0x06: regs.B = n(); break; // LD B, n
-        case 0x16: regs.D = n(); break; // LD D, n
-        case 0x26: regs.H = n(); break; // LD H, n
-        case 0x36:
-            temp8 = n();
-            skd_write(regs.HL, temp8);
-            break; // LD (HL), n
-        case 0x0E: regs.C = n(); break; // LD C, n
-        case 0x1E: regs.E = n(); break; // LD E, n
-        case 0x2E: regs.L = n(); break; // LD L, n
-        case 0x3E: regs.A = n(); break; // LD A, n
+        case 0x06: regs.B = n(); break;         // LD B, n
+        case 0x16: regs.D = n(); break;         // LD D, n
+        case 0x26: regs.H = n(); break;         // LD H, n
+        case 0x36: write(regs.HL, n()); break;  // LD (HL), n
+        case 0x0E: regs.C = n(); break;         // LD C, n
+        case 0x1E: regs.E = n(); break;         // LD E, n
+        case 0x2E: regs.L = n(); break;         // LD L, n
+        case 0x3E: regs.A = n(); break;         // LD A, n
         // LD A, (reg16)
-        case 0x0A: regs.A = read(regs.BC); break;   // LD A, (BC)
-        case 0x1A: regs.A = read(regs.DE); break;   // LD A, (DE)
-        case 0x2A: regs.A = read(regs.HL++); break; // LD A, (HL+)
-        case 0x3A: regs.A = read(regs.HL--); break; // LD A, (HL-)
+        case 0x0A: regs.A = read(regs.BC); break;    // LD A, (BC)
+        case 0x1A: regs.A = read(regs.DE); break;    // LD A, (DE)
+        case 0x2A: regs.A = read(regs.HL++); break;  // LD A, (HL+)
+        case 0x3A: regs.A = read(regs.HL--); break;  // LD A, (HL-)
         // LD B, r2
         case 0x40:
-            #if !PLAYABLE
+            #if DEBUG
             debugger->pause_exec();
             #endif
             break; // LD B, B
@@ -213,13 +184,13 @@ void CPU::execute(u8 opcode) {
         case 0x6E: regs.L = read(regs.HL); break;  // LD L, (HL)
         case 0x6F: regs.L = regs.A; break;         // LD L, A
         // LD (HL), r2
-        case 0x70: write(regs.HL, regs.B); break; // LD (HL), B
-        case 0x71: write(regs.HL, regs.C); break; // LD (HL), C
-        case 0x72: write(regs.HL, regs.D); break; // LD (HL), D
-        case 0x73: write(regs.HL, regs.E); break; // LD (HL), E
-        case 0x74: write(regs.HL, regs.H); break; // LD (HL), H
-        case 0x75: write(regs.HL, regs.L); break; // LD (HL), L
-        case 0x77: write(regs.HL, regs.A); break; // LD (HL), A
+        case 0x70: write(regs.HL, regs.B); break;  // LD (HL), B
+        case 0x71: write(regs.HL, regs.C); break;  // LD (HL), C
+        case 0x72: write(regs.HL, regs.D); break;  // LD (HL), D
+        case 0x73: write(regs.HL, regs.E); break;  // LD (HL), E
+        case 0x74: write(regs.HL, regs.H); break;  // LD (HL), H
+        case 0x75: write(regs.HL, regs.L); break;  // LD (HL), L
+        case 0x77: write(regs.HL, regs.A); break;  // LD (HL), A
         // LD A, r2
         case 0x78: regs.A = regs.B; break;         // LD A, B
         case 0x79: regs.A = regs.C; break;         // LD A, C
@@ -230,25 +201,25 @@ void CPU::execute(u8 opcode) {
         case 0x7E: regs.A = read(regs.HL); break;  // LD A, (HL)
         case 0x7F: break;                          // LD A, A
         // load 0xFF00
-        case 0xE0: skd_write(0xFF00 + n(), regs.A); break;  // LDH (n), A
-        case 0xF0: skd_read(0xFF00 + n(), regs.A); break;   // LDH A, (n)
-        case 0xE2: write(regs.C + 0xFF00, regs.A); break;   // LDH (C), A
-        case 0xF2: regs.A = read(regs.C + 0xFF00); break;   // LDH A, (C)
+        case 0xE0: write(0xFF00 + n(), regs.A); break;     // LDH (n), A
+        case 0xF0: regs.A = read(0xFF00 + n()); break;     // LDH A, (n)
+        case 0xE2: write(regs.C + 0xFF00, regs.A); break;  // LDH (C), A
+        case 0xF2: regs.A = read(regs.C + 0xFF00); break;  // LDH A, (C)
         // 16-bit memory load
-        case 0xEA: skd_write(nn(), regs.A); break; // LD (nn), A
-        case 0xFA: skd_read(nn(), regs.A); break;  // LD A, (nn)
+        case 0xEA: write(nn(), regs.A); break;  // LD (nn), A
+        case 0xFA: regs.A = read(nn()); break;  // LD A, (nn)
         // LD reg16, nn
-        case 0x01: regs.BC = nn(); break; // LD BC, nn
-        case 0x11: regs.DE = nn(); break; // LD DE, nn
-        case 0x21: regs.HL = nn(); break; // LD HL, nn
-        case 0x31: SP = nn(); break;      // LD SP, nn
+        case 0x01: regs.BC = nn(); break;  // LD BC, nn
+        case 0x11: regs.DE = nn(); break;  // LD DE, nn
+        case 0x21: regs.HL = nn(); break;  // LD HL, nn
+        case 0x31: SP = nn(); break;       // LD SP, nn
         // POP reg16
-        case 0xC1: pop(regs.BC); break; // POP BC
-        case 0xD1: pop(regs.DE); break; // POP DE
-        case 0xE1: pop(regs.HL); break; // POP HL
+        case 0xC1: pop(regs.BC); break;  // POP BC
+        case 0xD1: pop(regs.DE); break;  // POP DE
+        case 0xE1: pop(regs.HL); break;  // POP HL
         case 0xF1:
             regs.F = (read(SP++) & 0xF0) | (regs.F & 0xF);
-            skd_read(SP++, regs.A);
+            regs.A = read(SP++);
             break; // POP AF
         // PUSH reg16
         case 0xC5: push(regs.BC); break; // PUSH BC
@@ -261,7 +232,10 @@ void CPU::execute(u8 opcode) {
             write(addr, SP & 0xFF);
             write(addr + 1, SP >> 8);
         } break; // LD (nn), SP
-        case 0xF9: cycleCnt++; SP = regs.HL; break; // LD SP, HL
+        case 0xF9:
+            SP = regs.HL;
+            memory->sleep_cycle();
+            break; // LD SP, HL
         // ADD A, reg8
         case 0x80: add8(regs.B); break;         // ADD A, B
         case 0x81: add8(regs.C); break;         // ADD A, C
@@ -349,11 +323,11 @@ void CPU::execute(u8 opcode) {
         case 0x1C: inc8(regs.E); break; // INC E
         case 0x24: inc8(regs.H); break; // INC H
         case 0x2C: inc8(regs.L); break; // INC L
-        case 0x34:
-            temp8 = read(regs.HL);
-            inc8(temp8);
-            skd_write(regs.HL, temp8);
-            break; // INC (HL)
+        case 0x34: {
+            u8 val = read(regs.HL);
+            inc8(val);
+            write(regs.HL, val);
+        } break; // INC (HL)
         case 0x3C: inc8(regs.A); break; // INC A
         // DEC reg8
         case 0x05: dec8(regs.B); break; // DEC B
@@ -362,11 +336,11 @@ void CPU::execute(u8 opcode) {
         case 0x1D: dec8(regs.E); break; // DEC E
         case 0x25: dec8(regs.H); break; // DEC H
         case 0x2D: dec8(regs.L); break; // DEC L
-        case 0x35:
-            temp8 = read(regs.HL);
-            dec8(temp8);
-            skd_write(regs.HL, temp8);
-            break; // DEC (HL)
+        case 0x35: {
+            u8 val = read(regs.HL);
+            dec8(val);
+            write(regs.HL, val);
+        } break; // DEC (HL)
         case 0x3D: dec8(regs.A); break; // DEC A
         // ADD HL, n
         case 0x09: add16(regs.BC); break; // ADD HL, BC
@@ -374,66 +348,93 @@ void CPU::execute(u8 opcode) {
         case 0x29: add16(regs.HL); break; // ADD HL, HL
         case 0x39: add16(SP); break;      // ADD HL, SP
         // SP + n
-        case 0xE8: cycleCnt++; SP = addSP_n(); break; // ADD SP, n
+        case 0xE8:
+            SP = addSP_n();
+            memory->sleep_cycle();
+            break; // ADD SP, n
         case 0xF8: regs.HL = addSP_n(); break;        // LD HL, SP + n
         // INC reg16
-        case 0x03: cycleCnt++; regs.BC++; break; // INC BC
-        case 0x13: cycleCnt++; regs.DE++; break; // INC DE
-        case 0x23: cycleCnt++; regs.HL++; break; // INC HL
-        case 0x33: cycleCnt++; SP++; break;      // INC SP
+        case 0x03:
+            regs.BC++;
+            memory->sleep_cycle();
+            break; // INC BC
+        case 0x13:
+            regs.DE++;
+            memory->sleep_cycle();
+            break; // INC DE
+        case 0x23:
+            regs.HL++;
+            memory->sleep_cycle();
+            break; // INC HL
+        case 0x33:
+            SP++;
+            memory->sleep_cycle();
+            break; // INC SP
         // DEC reg16
-        case 0x0B: cycleCnt++; regs.BC--; break; // DEC BC
-        case 0x1B: cycleCnt++; regs.DE--; break; // DEC DE
-        case 0x2B: cycleCnt++; regs.HL--; break; // DEC HL
-        case 0x3B: cycleCnt++; SP--; break;      // DEC SP
+        case 0x0B:
+            regs.BC--;
+            memory->sleep_cycle();
+            break; // DEC BC
+        case 0x1B:
+            regs.DE--;
+            memory->sleep_cycle();
+            break; // DEC DE
+        case 0x2B:
+            regs.HL--;
+            memory->sleep_cycle();
+            break; // DEC HL
+        case 0x3B:
+            SP--;
+            memory->sleep_cycle();
+            break; // DEC SP
         // Rotate left A
-        case 0x07: rlc8(regs.A); set_flag(Z_FLAG, false); break; // RLCA
-        case 0x17: rl8(regs.A); set_flag(Z_FLAG, false); break;  // RLA
+        case 0x07: rlc8(regs.A); set_flag(Flag::Z, false); break; // RLCA
+        case 0x17: rl8(regs.A); set_flag(Flag::Z, false); break;  // RLA
         // Rotate right A
-        case 0x0F: rrc8(regs.A); set_flag(Z_FLAG, false); break; // RRCA
-        case 0x1F: rr8(regs.A); set_flag(Z_FLAG, false); break;  // RRA
+        case 0x0F: rrc8(regs.A); set_flag(Flag::Z, false); break; // RRCA
+        case 0x1F: rr8(regs.A); set_flag(Flag::Z, false); break;  // RRA
         // Misc ALU
         case 0x27: daa(); break; // DAA
         case 0x37:
-            set_flag(N_FLAG, false);
-            set_flag(H_FLAG, false);
-            set_flag(C_FLAG, true);
+            set_flag(Flag::N, false);
+            set_flag(Flag::H, false);
+            set_flag(Flag::C, true);
             break; // SCF
         case 0x2F:
             regs.A = ~regs.A;
-            set_flag(N_FLAG, true);
-            set_flag(H_FLAG, true);
+            set_flag(Flag::N, true);
+            set_flag(Flag::H, true);
             break; // CPL
         case 0x3F:
-            set_flag(N_FLAG, false);
-            set_flag(H_FLAG, false);
-            set_flag(C_FLAG, !check_flag(C_FLAG));
+            set_flag(Flag::N, false);
+            set_flag(Flag::H, false);
+            set_flag(Flag::C, !check_flag(Flag::C));
             break; // CCF
         // JP
         case 0xC3: jump_nn(); break; // JP nn
         case 0xC2:
-            if (!check_flag(Z_FLAG)) {
+            if (!check_flag(Flag::Z)) {
                 jump_nn();
             } else {
                 nn();
             }
             break; // JP NZ, nn
         case 0xD2:
-            if (!check_flag(C_FLAG)) {
+            if (!check_flag(Flag::C)) {
                 jump_nn();
             } else {
                 nn();
             }
             break; // JP NC, nn
         case 0xCA:
-            if (check_flag(Z_FLAG)) {
+            if (check_flag(Flag::Z)) {
                 jump_nn();
             } else {
                 nn();
             }
             break; // JP Z, nn
         case 0xDA:
-            if (check_flag(C_FLAG)) {
+            if (check_flag(Flag::C)) {
                 jump_nn();
             } else {
                 nn();
@@ -444,61 +445,61 @@ void CPU::execute(u8 opcode) {
         case 0x18: {
             s8 off = (s8)n();
             PC += off;
-            cycleCnt++;
+            memory->sleep_cycle();
         } break; // JR n
         case 0x20: {
             s8 off = (s8)n();
-            if (!check_flag(Z_FLAG)) {
+            if (!check_flag(Flag::Z)) {
                 PC += off;
-                cycleCnt++;
+                memory->sleep_cycle();
             }
         } break; // JR NZ, n
         case 0x30: {
             s8 off = (s8)n();
-            if (!check_flag(C_FLAG)) {
+            if (!check_flag(Flag::C)) {
                 PC += off;
-                cycleCnt++;
+                memory->sleep_cycle();
             }
         } break; // JR NC, n
         case 0x28: {
             s8 off = (s8)n();
-            if (check_flag(Z_FLAG)) {
+            if (check_flag(Flag::Z)) {
                 PC += off;
-                cycleCnt++;
+                memory->sleep_cycle();
             }
         } break; // JR Z, n
         case 0x38: {
             s8 off = (s8)n();
-            if (check_flag(C_FLAG)) {
+            if (check_flag(Flag::C)) {
                 PC += off;
-                cycleCnt++;
+                memory->sleep_cycle();
             }
         } break; // JR C, n
         // CALL
         case 0xCD: call_nn(); break; // CALL
         case 0xC4:
-            if (!check_flag(Z_FLAG)) {
+            if (!check_flag(Flag::Z)) {
                 call_nn();
             } else {
                 nn();
             }
             break; // CALL NZ, nn
         case 0xD4:
-            if (!check_flag(C_FLAG)) {
+            if (!check_flag(Flag::C)) {
                 call_nn();
             } else {
                 nn();
             }
             break; // CALL NC, nn
         case 0xCC:
-            if (check_flag(Z_FLAG)) {
+            if (check_flag(Flag::Z)) {
                 call_nn();
             } else {
                 nn();
             }
             break; // CALL Z, nn
         case 0xDC:
-            if (check_flag(C_FLAG)) {
+            if (check_flag(Flag::C)) {
                 call_nn();
             } else {
                 nn();
@@ -514,36 +515,43 @@ void CPU::execute(u8 opcode) {
         case 0xF7: rst(0x30); break; // RST 30H
         case 0xFF: rst(0x38); break; // RST 38H
         // RET
-        case 0xC9: pop(PC); cycleCnt++; break; // RET
+        case 0xC9:
+            pop(PC);
+            memory->sleep_cycle();
+            break; // RET
         case 0xC0:
-            cycleCnt++;
-            if (!check_flag(Z_FLAG)) {
+            memory->sleep_cycle();
+            if (!check_flag(Flag::Z)) {
                 pop(PC);
-                cycleCnt++;
+                memory->sleep_cycle();
             }
             break; // RET NZ
         case 0xD0:
-            cycleCnt++;
-            if (!check_flag(C_FLAG)) {
+            memory->sleep_cycle();
+            if (!check_flag(Flag::C)) {
                 pop(PC);
-                cycleCnt++;
+                memory->sleep_cycle();
             }
             break; // RET NC
         case 0xC8:
-            cycleCnt++;
-            if (check_flag(Z_FLAG)) {
+            memory->sleep_cycle();
+            if (check_flag(Flag::Z)) {
                 pop(PC);
-                cycleCnt++;
+                memory->sleep_cycle();
             }
             break; // RET Z
         case 0xD8:
-            cycleCnt++;
-            if (check_flag(C_FLAG)) {
+            memory->sleep_cycle();
+            if (check_flag(Flag::C)) {
                 pop(PC);
-                cycleCnt++;
+                memory->sleep_cycle();
             }
             break; // RET C
-        case 0xD9: pop(PC); cycleCnt++; ime = true; break; // RETI
+        case 0xD9:
+            pop(PC);
+            memory->sleep_cycle();
+            ime = true;
+            break; // RETI
         // CB
         case 0xCB: execute_cb(); break;
         // Error
@@ -574,10 +582,11 @@ void CPU::execute_cb() {
             case 0x03: rlc8(regs.E); break; // RLC E
             case 0x04: rlc8(regs.H); break; // RLC H
             case 0x05: rlc8(regs.L); break; // RLC L
-            case 0x06:
-                skd_read(regs.HL, temp8, [](CPU* c) { c->rlc8(c->temp8); });
-                skd_write(regs.HL, temp8);
-                break; // RLC (HL)
+            case 0x06: {
+                u8 val = read(regs.HL);
+                rlc8(val);
+                write(regs.HL, val);
+            } break; // RLC (HL)
             case 0x07: rlc8(regs.A); break; // RLC A
             // RRC reg8
             case 0x08: rrc8(regs.B); break; // RRC B
@@ -586,10 +595,11 @@ void CPU::execute_cb() {
             case 0x0B: rrc8(regs.E); break; // RRC E
             case 0x0C: rrc8(regs.H); break; // RRC H
             case 0x0D: rrc8(regs.L); break; // RRC L
-            case 0x0E:
-                skd_read(regs.HL, temp8, [](CPU* c) { c->rrc8(c->temp8); });
-                skd_write(regs.HL, temp8);
-                break;  // RRC (HL)
+            case 0x0E: {
+                u8 val = read(regs.HL);
+                rrc8(val);
+                write(regs.HL, val);
+            } break;  // RRC (HL)
             case 0x0F: rrc8(regs.A); break; // RRC A
             // RL reg8
             case 0x10: rl8(regs.B); break; // RL B
@@ -598,10 +608,11 @@ void CPU::execute_cb() {
             case 0x13: rl8(regs.E); break; // RL E
             case 0x14: rl8(regs.H); break; // RL H
             case 0x15: rl8(regs.L); break; // RL L
-            case 0x16:
-                skd_read(regs.HL, temp8, [](CPU* c) { c->rl8(c->temp8); });
-                skd_write(regs.HL, temp8);
-                break; // RL (HL)
+            case 0x16: {
+                u8 val = read(regs.HL);
+                rl8(val);
+                write(regs.HL, val);
+            } break; // RL (HL)
             case 0x17: rl8(regs.A); break; // RL A
             // RR reg8
             case 0x18: rr8(regs.B); break; // RR B
@@ -610,10 +621,11 @@ void CPU::execute_cb() {
             case 0x1B: rr8(regs.E); break; // RR E
             case 0x1C: rr8(regs.H); break; // RR H
             case 0x1D: rr8(regs.L); break; // RR L
-            case 0x1E:
-                skd_read(regs.HL, temp8, [](CPU* c) { c->rr8(c->temp8); });
-                skd_write(regs.HL, temp8);
-                break; // RR (HL)
+            case 0x1E: {
+                u8 val = read(regs.HL);
+                rr8(val);
+                write(regs.HL, val);
+            } break; // RR (HL)
             case 0x1F: rr8(regs.A); break; // RR A
             // SLA reg8
             case 0x20: sla8(regs.B); break; // SLA B
@@ -622,10 +634,11 @@ void CPU::execute_cb() {
             case 0x23: sla8(regs.E); break; // SLA E
             case 0x24: sla8(regs.H); break; // SLA H
             case 0x25: sla8(regs.L); break; // SLA L
-            case 0x26:
-                skd_read(regs.HL, temp8, [](CPU* c) { c->sla8(c->temp8); });
-                skd_write(regs.HL, temp8);
-                break; // SLA (HL)
+            case 0x26: {
+                u8 val = read(regs.HL);
+                sla8(val);
+                write(regs.HL, val);
+            } break; // SLA (HL)
             case 0x27: sla8(regs.A); break; // SLA A
             // SRA reg8
             case 0x28: sra8(regs.B); break; // SRA B
@@ -634,10 +647,11 @@ void CPU::execute_cb() {
             case 0x2B: sra8(regs.E); break; // SRA E
             case 0x2C: sra8(regs.H); break; // SRA H
             case 0x2D: sra8(regs.L); break; // SRA L
-            case 0x2E:
-                skd_read(regs.HL, temp8, [](CPU* c) { c->sra8(c->temp8); });
-                skd_write(regs.HL, temp8);
-                break; // SRA (HL)
+            case 0x2E: {
+                u8 val = read(regs.HL);
+                sra8(val);
+                write(regs.HL, val);
+            } break; // SRA (HL)
             case 0x2F: sra8(regs.A); break; // SRA A
             // SWAP reg8
             case 0x30: swap(regs.B); break; // SWAP B
@@ -646,10 +660,11 @@ void CPU::execute_cb() {
             case 0x33: swap(regs.E); break; // SWAP E
             case 0x34: swap(regs.H); break; // SWAP H
             case 0x35: swap(regs.L); break; // SWAP L
-            case 0x36:
-                skd_read(regs.HL, temp8, [](CPU* c) { c->swap(c->temp8); });
-                skd_write(regs.HL, temp8);
-                break; // SWAP (HL)
+            case 0x36: {
+                u8 val = read(regs.HL);
+                swap(val);
+                write(regs.HL, val);
+            } break; // SWAP (HL)
             case 0x37: swap(regs.A); break; // SWAP A
             // SRL reg8
             case 0x38: srl8(regs.B); break; // SRL B
@@ -658,51 +673,54 @@ void CPU::execute_cb() {
             case 0x3B: srl8(regs.E); break; // SRL E
             case 0x3C: srl8(regs.H); break; // SRL H
             case 0x3D: srl8(regs.L); break; // SRL L
-            case 0x3E:
-                skd_read(regs.HL, temp8, [](CPU* c) { c->srl8(c->temp8); });
-                skd_write(regs.HL, temp8);
-                break; // SRL (HL)
+            case 0x3E: {
+                u8 val = read(regs.HL);
+                srl8(val);
+                write(regs.HL, val);
+            } break; // SRL (HL)
             case 0x3F: srl8(regs.A); break; // SRL A
             default:
                 fatal("Impossible cb opcode=%02x\n", cbOP);
         }
     } else {
-        bitReg = (cbOP / 0x8) % 0x8;
+        u8 selBit = (cbOP / 0x8) % 0x8;
         u8 index = ((cbOP / 0x40) - 1) * 0x8 + (cbOP % 0x8);
         switch (index) {
             // BIT
-            case 0x00: bit(regs.B); break; // BIT b, B
-            case 0x01: bit(regs.C); break; // BIT b, C
-            case 0x02: bit(regs.D); break; // BIT b, D
-            case 0x03: bit(regs.E); break; // BIT b, E
-            case 0x04: bit(regs.H); break; // BIT b, H
-            case 0x05: bit(regs.L); break; // BIT b, L
-            case 0x06: skd_read(regs.HL, temp8, [](CPU* c) { c->bit(c->temp8); }); break; // BIT b, (HL)
-            case 0x07: bit(regs.A); break; // BIT b, A
+            case 0x00: bit(regs.B, selBit); break; // BIT b, B
+            case 0x01: bit(regs.C, selBit); break; // BIT b, C
+            case 0x02: bit(regs.D, selBit); break; // BIT b, D
+            case 0x03: bit(regs.E, selBit); break; // BIT b, E
+            case 0x04: bit(regs.H, selBit); break; // BIT b, H
+            case 0x05: bit(regs.L, selBit); break; // BIT b, L
+            case 0x06: bit(read(regs.HL), selBit); break; // BIT b, (HL)
+            case 0x07: bit(regs.A, selBit); break; // BIT b, A
             // RES
-            case 0x08: res(regs.B); break; // RES b, B
-            case 0x09: res(regs.C); break; // RES b, C
-            case 0x0A: res(regs.D); break; // RES b, D
-            case 0x0B: res(regs.E); break; // RES b, E
-            case 0x0C: res(regs.H); break; // RES b, H
-            case 0x0D: res(regs.L); break; // RES b, L
-            case 0x0E:
-                skd_read(regs.HL, temp8, [](CPU* c) { c->res(c->temp8); });
-                skd_write(regs.HL, temp8);
-                break; // RES b, (HL)
-            case 0x0F: res(regs.A); break; // RES b, A
+            case 0x08: res(regs.B, selBit); break; // RES b, B
+            case 0x09: res(regs.C, selBit); break; // RES b, C
+            case 0x0A: res(regs.D, selBit); break; // RES b, D
+            case 0x0B: res(regs.E, selBit); break; // RES b, E
+            case 0x0C: res(regs.H, selBit); break; // RES b, H
+            case 0x0D: res(regs.L, selBit); break; // RES b, L
+            case 0x0E: {
+                u8 val = read(regs.HL);
+                res(val, selBit);
+                write(regs.HL, val);
+            } break; // RES b, (HL)
+            case 0x0F: res(regs.A, selBit); break; // RES b, A
             // SET
-            case 0x10: set(regs.B); break; // SET b, B
-            case 0x11: set(regs.C); break; // SET b, C
-            case 0x12: set(regs.D); break; // SET b, D
-            case 0x13: set(regs.E); break; // SET b, E
-            case 0x14: set(regs.H); break; // SET b, H
-            case 0x15: set(regs.L); break; // SET b, L
-            case 0x16:
-                skd_read(regs.HL, temp8, [](CPU* c) { c->set(c->temp8); });
-                skd_write(regs.HL, temp8);
-                break; // SET b, (HL)
-            case 0x17: set(regs.A); break; // SET b, A
+            case 0x10: set(regs.B, selBit); break; // SET b, B
+            case 0x11: set(regs.C, selBit); break; // SET b, C
+            case 0x12: set(regs.D, selBit); break; // SET b, D
+            case 0x13: set(regs.E, selBit); break; // SET b, E
+            case 0x14: set(regs.H, selBit); break; // SET b, H
+            case 0x15: set(regs.L, selBit); break; // SET b, L
+            case 0x16: {
+                u8 val = read(regs.HL);
+                set(val, selBit);
+                write(regs.HL, val);
+            } break; // SET b, (HL)
+            case 0x17: set(regs.A, selBit); break; // SET b, A
             default:
                 fatal("Impossible bit operation for cb opcode=%02x\n", cbOP);
         }
@@ -710,9 +728,12 @@ void CPU::execute_cb() {
 }
 // clang-format on
 
-void CPU::set_flag(u8 flag, bool set) { regs.F = (regs.F & ~flag) | (flag * set); }
-bool CPU::check_flag(u8 flag) { return (regs.F & flag) != 0; }
+void CPU::set_flag(Flag flag, bool set) { regs.F = (regs.F & ~((u8)flag) | (((u8)flag) * set)); }
+
+bool CPU::check_flag(Flag flag) { return (regs.F & ((u8)flag)) != 0; }
+
 u8 CPU::n() { return read(PC++); }
+
 u16 CPU::nn() {
     u16 res = read(PC);
     PC++;
@@ -720,134 +741,118 @@ u16 CPU::nn() {
     PC++;
     return res;
 }
+
 u8 CPU::read(u16 addr) {
-    cycleCnt++;
+    memory->sleep_cycle();
     return memory->read(addr);
 }
+
 void CPU::write(u16 addr, u8 val) {
-    cycleCnt++;
+    memory->sleep_cycle();
     memory->write(addr, val);
-}
-void CPU::skd_read(u16 addr, u8& dest, Callback&& readCallback) {
-    skd_read(addr, dest);
-    callbackCycle = cycleCnt;
-    callback = readCallback;
-}
-void CPU::skd_read(u16 addr, u8& dest) {
-    memory->schedule_read(addr, &dest, cycleCnt);
-    cycleCnt++;
-}
-void CPU::skd_write(u16 addr, u8& val) {
-    memory->schedule_write(addr, &val, cycleCnt);
-    cycleCnt++;
 }
 
 void CPU::pop(u16& dest) {
-    skd_read(SP++, *((u8*)&dest));
-    skd_read(SP++, *((u8*)&dest + 1));
+    *((u8*)&dest) = read(SP++);
+    *((u8*)&dest + 1) = read(SP++);
 }
 
 void CPU::push(u16 reg) {
-    cycleCnt++;  // Stack push takes an extra blank cycle before pushing
-
-    static u8 msb;
-    static u8 lsb;
-    msb = reg >> 8;
-    lsb = reg & 0xFF;
-    skd_write(--SP, msb);
-    skd_write(--SP, lsb);
+    memory->sleep_cycle();  // Stack push takes an extra blank cycle before pushing
+    write(--SP, reg >> 8);
+    write(--SP, reg & 0xFF);
 }
 
 void CPU::add8(u8 val) {
     u8 res = regs.A + val;
-    set_flag(Z_FLAG, res == 0);
-    set_flag(N_FLAG, false);
-    set_flag(H_FLAG, (regs.A & 0xF) + (val & 0xF) > 0xF);
-    set_flag(C_FLAG, (0xFF - regs.A) < val);
+    set_flag(Flag::Z, res == 0);
+    set_flag(Flag::N, false);
+    set_flag(Flag::H, (regs.A & 0xF) + (val & 0xF) > 0xF);
+    set_flag(Flag::C, (0xFF - regs.A) < val);
     regs.A = res;
 }
 
 void CPU::adc8(u8 val) {
-    u8 carry = check_flag(C_FLAG);
+    u8 carry = check_flag(Flag::C);
     u8 res = regs.A + val + carry;
-    set_flag(Z_FLAG, res == 0);
-    set_flag(N_FLAG, false);
-    set_flag(H_FLAG, carry + (regs.A & 0xF) + (val & 0xF) > 0xF);
-    set_flag(C_FLAG, val + carry > 0xFF - regs.A);
+    set_flag(Flag::Z, res == 0);
+    set_flag(Flag::N, false);
+    set_flag(Flag::H, carry + (regs.A & 0xF) + (val & 0xF) > 0xF);
+    set_flag(Flag::C, val + carry > 0xFF - regs.A);
     regs.A = res;
 }
 
 void CPU::sub8(u8 val) {
     u8 res = regs.A - val;
-    set_flag(Z_FLAG, regs.A == val);
-    set_flag(N_FLAG, true);
-    set_flag(H_FLAG, (regs.A & 0xF) < (val & 0xF));
-    set_flag(C_FLAG, regs.A < val);
+    set_flag(Flag::Z, regs.A == val);
+    set_flag(Flag::N, true);
+    set_flag(Flag::H, (regs.A & 0xF) < (val & 0xF));
+    set_flag(Flag::C, regs.A < val);
     regs.A = res;
 }
 
 void CPU::sbc8(u8 val) {
-    u8 carry = check_flag(C_FLAG);
+    u8 carry = check_flag(Flag::C);
     u8 res = regs.A - (val + carry);
-    set_flag(Z_FLAG, res == 0);
-    set_flag(N_FLAG, true);
-    set_flag(H_FLAG, (regs.A & 0xF) < ((val & 0xF) + carry));
-    set_flag(C_FLAG, regs.A < val + carry);
+    set_flag(Flag::Z, res == 0);
+    set_flag(Flag::N, true);
+    set_flag(Flag::H, (regs.A & 0xF) < ((val & 0xF) + carry));
+    set_flag(Flag::C, regs.A < val + carry);
     regs.A = res;
 }
 
 void CPU::and8(u8 val) {
     regs.A &= val;
-    set_flag(Z_FLAG, regs.A == 0);
-    set_flag(N_FLAG, false);
-    set_flag(H_FLAG, true);
-    set_flag(C_FLAG, false);
+    set_flag(Flag::Z, regs.A == 0);
+    set_flag(Flag::N, false);
+    set_flag(Flag::H, true);
+    set_flag(Flag::C, false);
 }
 
 void CPU::xor8(u8 val) {
     regs.A ^= val;
-    set_flag(Z_FLAG, regs.A == 0);
-    set_flag(N_FLAG, false);
-    set_flag(H_FLAG, false);
-    set_flag(C_FLAG, false);
+    set_flag(Flag::Z, regs.A == 0);
+    set_flag(Flag::N, false);
+    set_flag(Flag::H, false);
+    set_flag(Flag::C, false);
 }
 
 void CPU::or8(u8 val) {
     regs.A |= val;
-    set_flag(Z_FLAG, regs.A == 0);
-    set_flag(N_FLAG, false);
-    set_flag(H_FLAG, false);
-    set_flag(C_FLAG, false);
+    set_flag(Flag::Z, regs.A == 0);
+    set_flag(Flag::N, false);
+    set_flag(Flag::H, false);
+    set_flag(Flag::C, false);
 }
 
 void CPU::cp8(u8 val) {
-    set_flag(Z_FLAG, regs.A == val);
-    set_flag(N_FLAG, true);
-    set_flag(H_FLAG, (regs.A & 0xF) < (val & 0xF));
-    set_flag(C_FLAG, regs.A < val);
+    set_flag(Flag::Z, regs.A == val);
+    set_flag(Flag::N, true);
+    set_flag(Flag::H, (regs.A & 0xF) < (val & 0xF));
+    set_flag(Flag::C, regs.A < val);
 }
 
 void CPU::inc8(u8& reg) {
     reg++;
-    set_flag(Z_FLAG, reg == 0);
-    set_flag(N_FLAG, false);
-    set_flag(H_FLAG, !(reg & 0xF));
+    set_flag(Flag::Z, reg == 0);
+    set_flag(Flag::N, false);
+    set_flag(Flag::H, !(reg & 0xF));
 }
 
 void CPU::dec8(u8& reg) {
     reg--;
-    set_flag(Z_FLAG, reg == 0);
-    set_flag(N_FLAG, true);
-    set_flag(H_FLAG, (reg & 0xF) == 0xF);
+    set_flag(Flag::Z, reg == 0);
+    set_flag(Flag::N, true);
+    set_flag(Flag::H, (reg & 0xF) == 0xF);
 }
 
 void CPU::add16(u16 val) {
     u16 res = regs.HL + val;
-    set_flag(N_FLAG, false);
-    set_flag(H_FLAG, (0xFFF - (regs.HL & 0xFFF)) < (val & 0xFFF));
-    set_flag(C_FLAG, (0xFFFF - regs.HL) < val);
+    set_flag(Flag::N, false);
+    set_flag(Flag::H, (0xFFF - (regs.HL & 0xFFF)) < (val & 0xFFF));
+    set_flag(Flag::C, (0xFFFF - regs.HL) < val);
     regs.HL = res;
-    cycleCnt++;
+    memory->sleep_cycle();
 }
 
 u16 CPU::addSP_n() {
@@ -855,50 +860,43 @@ u16 CPU::addSP_n() {
     s8 off = (s8)n();
     u16 res = stackPtr + off;
 
-    set_flag(Z_FLAG, false);
-    set_flag(N_FLAG, false);
+    set_flag(Flag::Z, false);
+    set_flag(Flag::N, false);
 
-    // TODO Verify that this works:
-    // https://stackoverflow.com/questions/5159603/gbz80-how-does-ld-hl-spe-affect-h-and-c-flags
-    // stackPtr + off & 0xF
-    set_flag(H_FLAG, (off & 0xF) > 0xF - (stackPtr & 0xF));
-    set_flag(C_FLAG, (off & 0xFF) > 0xFF - (stackPtr & 0xFF));
-    // set_flag(H_FLAG, ((stackPtr ^ off) & 0x10) == 0x10);
-    // set_flag(C_FLAG, ((stackPtr ^ off) & 0x100) == 0x100);
+    set_flag(Flag::H, (off & 0xF) > 0xF - (stackPtr & 0xF));
+    set_flag(Flag::C, (off & 0xFF) > 0xFF - (stackPtr & 0xFF));
 
-    cycleCnt++;
+    memory->sleep_cycle();
     return res;
 }
 
 void CPU::daa() {
-    if (check_flag(N_FLAG)) {  // Subtraction
-        if (check_flag(C_FLAG)) regs.A -= 0x6 << 4;
-        if (check_flag(H_FLAG)) regs.A -= 0x6;
+    if (check_flag(Flag::N)) {  // Subtraction
+        if (check_flag(Flag::C)) regs.A -= 0x6 << 4;
+        if (check_flag(Flag::H)) regs.A -= 0x6;
     } else {  // Addition
-        if (check_flag(C_FLAG) || regs.A > 0x99) {
+        if (check_flag(Flag::C) || regs.A > 0x99) {
             regs.A += 0x6 << 4;
-            set_flag(C_FLAG, true);
+            set_flag(Flag::C, true);
         }
-        if (check_flag(H_FLAG) || (regs.A & 0xF) > 0x9) regs.A += 0x6;
+        if (check_flag(Flag::H) || (regs.A & 0xF) > 0x9) regs.A += 0x6;
     }
-    set_flag(Z_FLAG, regs.A == 0);
-    set_flag(H_FLAG, false);
+    set_flag(Flag::Z, regs.A == 0);
+    set_flag(Flag::H, false);
 }
 
 void CPU::jump_nn() {
-    skd_read(PC, *((u8*)&PC));
-    PC++;
-    skd_read(PC, *((u8*)&PC + 1));
-    PC++;
-    cycleCnt++;
+    u8 loByte = read(PC);
+    u8 hiByte = read(PC + 1);
+    PC = loByte | (hiByte << 8);
+    memory->sleep_cycle();
 }
 
 void CPU::call_nn() {
-    skd_read(PC, *((u8*)&PC));
-    PC++;
-    skd_read(PC, *((u8*)&PC + 1));
-    PC++;
-    push(PC);
+    u8 loByte = read(PC);
+    u8 hiByte = read(PC + 1);
+    push(PC + 2);
+    PC = loByte | (hiByte << 8);
 }
 
 void CPU::rst(u16 addr) {
@@ -912,77 +910,77 @@ void CPU::freeze() {
 }
 
 void CPU::rlc8(u8& reg) {
-    set_flag(C_FLAG, reg >> 7);
+    set_flag(Flag::C, reg >> 7);
     reg = (reg << 1) | (reg >> 7);
-    set_flag(Z_FLAG, reg == 0);
-    set_flag(N_FLAG, false);
-    set_flag(H_FLAG, false);
+    set_flag(Flag::Z, reg == 0);
+    set_flag(Flag::N, false);
+    set_flag(Flag::H, false);
 }
 
 void CPU::rrc8(u8& reg) {
-    set_flag(C_FLAG, reg & 0x1);
+    set_flag(Flag::C, reg & 0x1);
     reg = (reg << 7) | (reg >> 1);
-    set_flag(Z_FLAG, reg == 0);
-    set_flag(N_FLAG, false);
-    set_flag(H_FLAG, false);
+    set_flag(Flag::Z, reg == 0);
+    set_flag(Flag::N, false);
+    set_flag(Flag::H, false);
 }
 
 void CPU::rl8(u8& reg) {
-    u8 res = (reg << 1) | check_flag(C_FLAG);
+    u8 res = (reg << 1) | check_flag(Flag::C);
 
-    set_flag(Z_FLAG, res == 0);
-    set_flag(N_FLAG, false);
-    set_flag(H_FLAG, false);
-    set_flag(C_FLAG, reg & (1 << 7));
+    set_flag(Flag::Z, res == 0);
+    set_flag(Flag::N, false);
+    set_flag(Flag::H, false);
+    set_flag(Flag::C, reg & (1 << 7));
 
     reg = res;
 }
 
 void CPU::rr8(u8& reg) {
-    u8 res = (check_flag(C_FLAG) << 7) | (reg >> 1);
-    set_flag(Z_FLAG, res == 0);
-    set_flag(N_FLAG, false);
-    set_flag(H_FLAG, false);
-    set_flag(C_FLAG, reg & 0x1);
+    u8 res = (check_flag(Flag::C) << 7) | (reg >> 1);
+    set_flag(Flag::Z, res == 0);
+    set_flag(Flag::N, false);
+    set_flag(Flag::H, false);
+    set_flag(Flag::C, reg & 0x1);
     reg = res;
 }
 
 void CPU::sla8(u8& reg) {
-    set_flag(C_FLAG, reg >> 7);
+    set_flag(Flag::C, reg >> 7);
     reg <<= 1;
-    set_flag(Z_FLAG, reg == 0);
-    set_flag(N_FLAG, false);
-    set_flag(H_FLAG, false);
+    set_flag(Flag::Z, reg == 0);
+    set_flag(Flag::N, false);
+    set_flag(Flag::H, false);
 }
 
 void CPU::sra8(u8& reg) {
-    set_flag(C_FLAG, reg & 0x1);
+    set_flag(Flag::C, reg & 0x1);
     reg = (u8)((s8)reg >> 1);  // Arithmetic right shift
-    set_flag(Z_FLAG, reg == 0);
-    set_flag(N_FLAG, false);
-    set_flag(H_FLAG, false);
+    set_flag(Flag::Z, reg == 0);
+    set_flag(Flag::N, false);
+    set_flag(Flag::H, false);
 }
 
 void CPU::swap(u8& reg) {
     reg = ((reg & 0xF) << 4) | (reg >> 4);
-    set_flag(Z_FLAG, reg == 0);
-    set_flag(N_FLAG, false);
-    set_flag(H_FLAG, false);
-    set_flag(C_FLAG, false);
+    set_flag(Flag::Z, reg == 0);
+    set_flag(Flag::N, false);
+    set_flag(Flag::H, false);
+    set_flag(Flag::C, false);
 }
 
 void CPU::srl8(u8& reg) {
-    set_flag(C_FLAG, reg & 0x1);
+    set_flag(Flag::C, reg & 0x1);
     reg >>= 1;
-    set_flag(Z_FLAG, reg == 0);
-    set_flag(N_FLAG, false);
-    set_flag(H_FLAG, false);
+    set_flag(Flag::Z, reg == 0);
+    set_flag(Flag::N, false);
+    set_flag(Flag::H, false);
 }
 
-void CPU::bit(u8 reg) {
-    set_flag(Z_FLAG, (reg & (1 << bitReg)) == 0);
-    set_flag(N_FLAG, false);
-    set_flag(H_FLAG, true);
+void CPU::bit(u8 reg, u8 bit) {
+    set_flag(Flag::Z, (reg & (1 << bit)) == 0);
+    set_flag(Flag::N, false);
+    set_flag(Flag::H, true);
 }
-void CPU::res(u8& reg) { reg &= ~(1 << bitReg); }
-void CPU::set(u8& reg) { reg |= 1 << bitReg; }
+void CPU::res(u8& reg, u8 bit) { reg &= ~(1 << bit); }
+void CPU::set(u8& reg, u8 bit) { reg |= 1 << bit; }

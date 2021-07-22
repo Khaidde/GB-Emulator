@@ -1,7 +1,5 @@
 #include "apu.hpp"
 
-#include <math.h>
-
 #include "memory.hpp"
 
 template <int maxLoad>

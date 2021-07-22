@@ -34,7 +34,7 @@ constexpr struct {
 Cartridge::Cartridge(CartridgeInfo& info, const char* cartName, int maxRomBanks, int maxRamBanks,
                      u8* rom)
     : info(info) {
-#if PLAYABLE
+#if LOG
     u8 title[16];
     int t = 0;
     if (info.isCGB) {
@@ -49,7 +49,7 @@ Cartridge::Cartridge(CartridgeInfo& info, const char* cartName, int maxRomBanks,
         } else if (rom[0x143] == 0xC0) {
             printf("CGB Flag: only works on CGB\n");
         } else {
-            // fatal("TODO implement DMG-mode on CGB");
+            fatal("TODO implement DMG-mode on CGB");
         }
     } else {
         for (int c = 0x134; c < 0x144; c++) {
@@ -102,7 +102,7 @@ Cartridge::Cartridge(CartridgeInfo& info, const char* cartName, int maxRomBanks,
         this->info.hasRam = false;
     }
 
-#if PLAYABLE
+#if LOG
     if (cartName[3] == '1') {
         if (romType == 5) {
             printf("ROM Size: 1 Mbyte (63 banks on MBC1)\n");
@@ -135,7 +135,7 @@ Cartridge::Cartridge(CartridgeInfo& info, const char* cartName, int maxRomBanks,
 }
 
 Cartridge::~Cartridge() {
-#if PLAYABLE
+#if LOG  // TODO this should be !DEBUG
     if (info.hasBattery) {
         std::vector<u8> ram;
         ram.reserve(numRamBanks * RAM_BANK_SIZE);
@@ -158,7 +158,7 @@ Cartridge::~Cartridge() {
 }
 
 void Cartridge::try_load_save_file() {
-#if PLAYABLE
+#if LOG  // TODO this should be !DEBUG
     std::ifstream saveFile(info.savePath, std::ios::binary | std::ios::ate);
     if (saveFile.is_open()) {
         printf("Loading save file: %s\n", info.savePath.c_str());
@@ -202,7 +202,7 @@ u8 Cartridge::read_ram(u16 addr) {
 ROMOnly::ROMOnly(CartridgeInfo& info, u8* rom) : Cartridge(info, "ROM Only", 2, 0, rom) {}
 
 void ROMOnly::write(u16 addr, u8 val) {
-#if PLAYABLE
+#if LOG
     printf("Warning: Attempting to write to rom only cartridge, addr=%02x val=%02x.\n", addr, val);
 #endif
 }

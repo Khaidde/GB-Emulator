@@ -14,8 +14,7 @@ public:
     void restart();
 
     void handle_interrupts();
-    bool is_fetching();
-    void emulate_cycle();
+    void fetch_execute();
 
 private:
     friend class Debugger;
@@ -44,38 +43,27 @@ private:
     u16 SP;
     u16 PC;
 
-    u8 temp8;  // temporary register used for delayed memory read and writes
-
-    u8 bitReg;  // bit select for cb operations above 0x40
-
     bool halted;
     bool haltBug;
     bool ime;
     bool imeScheduled;
 
-    static constexpr u8 Z_FLAG = 1 << 7;  // Zero flag
-    static constexpr u8 N_FLAG = 1 << 6;  // Subtract flag
-    static constexpr u8 H_FLAG = 1 << 5;  // Half Carry flag
-    static constexpr u8 C_FLAG = 1 << 4;  // Carry flag
+    void execute(u8 opcode);
+    void execute_cb();
 
-    u8 cycleCnt;
-    void set_flag(u8 flag, bool set);
-    bool check_flag(u8 flag);
+    enum class Flag : u8 {
+        Z = 1 << 7,  // Zero flag
+        N = 1 << 6,  // Subtract flag
+        H = 1 << 5,  // Half Carry flag
+        C = 1 << 4,  // Carry flag
+    };
+    void set_flag(Flag flag, bool set);
+    bool check_flag(Flag flag);
+
     u8 n();
     u16 nn();
     u8 read(u16 addr);
     void write(u16 addr, u8 val);
-
-    using Callback = void (*)(CPU* c);
-    u8 callbackCycle;
-    Callback callback;
-
-    void skd_read(u16 addr, u8& dest, Callback&& readCallback);
-    void skd_read(u16 addr, u8& dest);
-    void skd_write(u16 addr, u8& val);
-
-    void execute(u8 opcode);
-    void execute_cb();
 
     void pop(u16& dest);
     void push(u16 val);
@@ -116,7 +104,7 @@ private:
     void swap(u8& reg);
     void srl8(u8& reg);
 
-    void bit(u8 reg);
-    void res(u8& reg);
-    void set(u8& reg);
+    void bit(u8 reg, u8 bit);
+    void res(u8& reg, u8 bit);
+    void set(u8& reg, u8 bit);
 };

@@ -42,7 +42,7 @@ struct Fetcher {
     bool windowXEnable;
     u8 windowY;
 
-    u16 tileRowAddrOff;
+    u16 tileByteAddr;
     u8 tileAttribs;
     u8 data0;
     u8 data1;
@@ -110,10 +110,13 @@ public:
     void set_debugger(Debugger& debug) { this->debugger = &debug; }
 
     void write_register(u16 addr, u8 val);
+    void write_vbk(u8 val);
+
+    void write_vram(u16 addr, u8 val);
+    u8 read_vram(u16 addr);
+
     bool is_oam_read_blocked();
     bool is_oam_write_blocked();
-    bool is_vram_read_blocked();
-    bool is_vram_write_blocked();
 
     void render(u32* pixelBuffer);
     void emulate_clock();
@@ -160,6 +163,12 @@ private:
     static constexpr u16 OAM_START_ADDR = 0xFE00;
     u8* oamAddrBlock;
 
+    static constexpr u16 VRAM_START_ADDR = 0x8000;
+    using VRAMBank = u8[0x2000];
+    VRAMBank* curVramBank;
+    VRAMBank tileMapVram;     // VRAM BANK 0
+    VRAMBank tileAttribVram;  // VRAM BANK 1
+
     using FrameBuffer = u32[160 * 144];
     bool bufferSel;
     FrameBuffer frameBuffers[2];
@@ -192,8 +201,6 @@ private:
     bool oamBlockWrite;
     bool vramBlockRead;
     bool vramBlockWrite;
-
-    // Mode mode;
 
     // ICE_CREAM_GB const u32 baseColors[4] = {0xFFFFF6D3, 0xFFF9A875, 0xFFEB6B6F, 0xFF7C3F58};
     // COLD_FIRE_GB const u32 baseColors[4] = {0xFFF6C6A8, 0xFFD17C7C, 0xFF5B768D, 0xFF46425E};

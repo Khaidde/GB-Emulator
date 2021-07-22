@@ -33,8 +33,8 @@ private:
 
     Input input;
     Timer timer;
-    PPU ppu;
     APU apu;
+    PPU ppu;
     Memory memory;
     CPU cpu;
 };

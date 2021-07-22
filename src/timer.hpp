@@ -2,13 +2,17 @@
 
 #include "general.hpp"
 
+class Debugger;
 class Memory;
 
 class Timer {
 public:
     Timer(Memory& memory);
     void restart();
+    void set_debugger(Debugger& debugger) { this->debugger = &debugger; }
+
     void emulate_clock();
+    void try_trigger_tima();
 
     void reset_div();
     void write_tima(u8 newTima);
@@ -16,6 +20,9 @@ public:
     void write_tac(u8 newTac);
 
 private:
+    friend class Debugger;
+    Debugger* debugger;
+
     Memory* memory;
 
     u8* div;
