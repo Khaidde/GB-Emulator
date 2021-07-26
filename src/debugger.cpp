@@ -322,17 +322,17 @@ void Debugger::print_info() {
     auto stateInfo = PPU_STATE_INFO[state];
     printf("\tcc=%d/~%d mode=%s\n", (stateInfo.avgClockCompletion - ppu->lineClocks) / 2,
            stateInfo.avgClocks / 2, stateInfo.name);
-    // printf("\ttimerClock=%04x\n", memory->timer->clocks / 2);
+    printf("\ttimerClock=%04x\n", memory->timer->cycles * 2);
 
     // print_reg(IOReg::JOYP_REG, "Joypad");
 
     // print_reg(IOReg::SB_REG, "Serial Transfer Data");
     // print_reg(IOReg::SC_REG, "Serial Transfer Control");
 
-    // print_reg(IOReg::DIV_REG, "Divide");
-    // print_reg(IOReg::TIMA_REG, "Timer Counter");
-    // print_reg(IOReg::TMA_REG, "Timer Modulo");
-    // print_reg(IOReg::TAC_REG, "Timer Control");
+    print_reg(IOReg::DIV_REG, "Divide");
+    print_reg(IOReg::TIMA_REG, "Timer Counter");
+    print_reg(IOReg::TMA_REG, "Timer Modulo");
+    print_reg(IOReg::TAC_REG, "Timer Control");
 
     // print_reg(IOReg::SCY_REG, "Y-Scoll");
     // print_reg(IOReg::SCX_REG, "X-Scoll");

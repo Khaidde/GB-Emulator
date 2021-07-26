@@ -65,6 +65,12 @@ void CPU::handle_interrupts() {
 }
 
 void CPU::fetch_execute() {
+    if (memory->is_speed_switching()) {
+        memory->sleep_cycle();
+        memory->emulate_speed_switch_cycle();
+        return;
+    }
+
     memory->sleep_cycle();  // Sleep before handling interrupt to check for late interrupts
     handle_interrupts();
     if (halted) {
@@ -76,6 +82,7 @@ void CPU::fetch_execute() {
     // PAUSE_EXEC(this, debugger, 0x165);
     // }
     // PAUSE_EXEC(this, debugger, 0x48);
+    // PAUSE_EXEC(this, debugger, 0x217);
 #endif
 
     if (debugger->is_paused()) {
@@ -94,10 +101,9 @@ void CPU::execute(u8 opcode) {
     switch (opcode) {
         case 0x00: break; // NOP
         case 0x10: // STOP
-            // TODO implement stop functionality correctly
-            // Other emulators seem to wait some amount of cycles before waking up (0x20000 on gambatte)
-            // This allows double speed mode on CGB to work
-
+            if (memory->should_speed_switch()) {
+                memory->start_speed_switch();
+            }
             PC++;  // Stop instruction will skip the immediate next byte
             break;
         case 0x76:  // HALT
@@ -127,7 +133,7 @@ void CPU::execute(u8 opcode) {
         case 0x3A: regs.A = read(regs.HL--); break;  // LD A, (HL-)
         // LD B, r2
         case 0x40:
-            #if DEBUG
+            #if DEBUG && !LOG
             debugger->pause_exec();
             #endif
             break; // LD B, B

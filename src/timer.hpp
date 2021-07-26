@@ -11,7 +11,7 @@ public:
     void restart();
     void set_debugger(Debugger& debugger) { this->debugger = &debugger; }
 
-    void emulate_clock();
+    void emulate_cycle();
     void try_trigger_tima();
 
     void reset_div();
@@ -28,9 +28,9 @@ private:
     u8* div;
     u8* tima;
     u8* tma;
-    u16 clocks;
+    u16 cycles;
     bool oldBitSet;
-    u8 timaScheduleCnt;
+    bool timaIntrSchedule;
 
     bool timaWrote;     // Whether or not tima was written to by cpu this cycle
     bool timaReloaded;  // Whether or not tima was reloaded this cycle

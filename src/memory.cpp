@@ -42,6 +42,10 @@ void Memory::restart() {
     }
     mem[IOReg::IE_REG] = 0x00;
 
+    isDoubleSpeed = false;
+    prepareSpeedSwitch = false;
+    speedSwitchCycleCnt = 0;
+
     dmaInProgress = false;
     scheduleDma = false;
     dmaCycleCnt = 0;
@@ -187,9 +191,12 @@ void Memory::write(u16 addr, u8 val) {
             dmaStartAddr = val << 8;
             mem[addr] = val;
             break;
-        case IOReg::KEY1_REG: {
-            fatal("TODO Unimplemented speed switch register\n");
-        }
+        case IOReg::KEY1_REG:
+            if (val & 0x1) {
+                prepareSpeedSwitch = true;
+            }
+            mem[addr] = (isDoubleSpeed << 7) | 0x7E | (val & 0x1);
+            break;
         case IOReg::VBK_REG:
             if (is_CGB()) {
                 ppu->write_vbk(val);
@@ -206,6 +213,9 @@ void Memory::write(u16 addr, u8 val) {
         case IOReg::RP_REG: {
             fatal("TODO Unimplemented infared communications port\n");
         }
+        case IOReg::OPRI_REG: {
+            fatal("TODO test if opri is writable\n");
+        }
         case IOReg::SVBK_REG:
             if (is_CGB()) {
                 u8 bank = (val & 0x7);
@@ -215,6 +225,22 @@ void Memory::write(u16 addr, u8 val) {
             break;
         default:
             mem[addr] = val;
+    }
+}
+
+void Memory::start_speed_switch() {
+    timer->reset_div();
+    speedSwitchCycleCnt = 0x8000;
+}
+
+bool Memory::is_speed_switching() { return speedSwitchCycleCnt > 0; }
+
+void Memory::emulate_speed_switch_cycle() {
+    speedSwitchCycleCnt--;
+    if (speedSwitchCycleCnt == 0) {
+        isDoubleSpeed = !isDoubleSpeed;
+        prepareSpeedSwitch = false;
+        mem[IOReg::KEY1_REG] = (isDoubleSpeed << 7) | 0x7E;
     }
 }
 
@@ -238,12 +264,12 @@ void Memory::emulate_dma_cycle() {
 
 int Memory::get_elapsed_cycles() { return elapsedCycles; }
 
-void Memory::reset_elapsed_cycles() { elapsedCycles -= PPU::TOTAL_CLOCKS; }
+void Memory::reset_elapsed_cycles() { elapsedCycles -= PPU::TOTAL_CLOCKS << isDoubleSpeed; }
 
 void Memory::sleep_cycle() {
     emulate_dma_cycle();
-    for (int i = 0; i < 4; i++) {
-        timer->emulate_clock();
+    timer->emulate_cycle();
+    for (int i = 0; i < 4 >> (is_CGB() && isDoubleSpeed); i++) {
         apu->emulate_clock();
         ppu->emulate_clock();
     }

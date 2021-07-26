@@ -659,11 +659,13 @@ void PPU::sprite_fetch() {
 
                 SpriteFIFOData cur = {col, palette, bgPriority, fetcher.curSprite->oamIndex};
                 if (fifoSize > i) {
-                    // Sprites with lower oam index are rendered on top in GBC
-                    bool oamIndexPriority = ((memory->read(IOReg::OPRI_REG) & 0x1) == 0 &&
-                                             spriteFifo.get(i)->oamIndex > cur.oamIndex);
-                    if (oamIndexPriority || spriteFifo.get(i)->colIndex == 0) {
-                        spriteFifo.set(i, std::move(cur));
+                    if (col != 0) {
+                        // Sprites with lower oam index are rendered on top in GBC
+                        bool oamIndexPriority = ((memory->read(IOReg::OPRI_REG) & 0x1) == 0 &&
+                                                 spriteFifo.get(i)->oamIndex > cur.oamIndex);
+                        if (oamIndexPriority || spriteFifo.get(i)->colIndex == 0) {
+                            spriteFifo.set(i, std::move(cur));
+                        }
                     }
                 } else {
                     spriteFifo.push_tail(std::move(cur));

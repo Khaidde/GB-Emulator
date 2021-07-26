@@ -14,12 +14,12 @@ void Timer::restart() {
     // Note that cpu is 4 cycles late due to initial fetch cycle
     if (memory->is_CGB()) {
         // 0x2674 <= clocks < 0x2678
-        clocks = 0x2674;
+        cycles = 0x2674 >> 2;
     } else {
         // 0xABC8 <= clocks <= 0xABCC
-        clocks = 0xABC8;
+        cycles = 0xABC8 >> 2;
     }
-    timaScheduleCnt = 0;
+    timaIntrSchedule = false;
 
     oldBitSet = false;
 
@@ -29,35 +29,32 @@ void Timer::restart() {
     write_tac(0xF8);
 }
 
-static bool newBitSet;
-void Timer::emulate_clock() {
-    clocks++;
-    *div = clocks >> 8;
+void Timer::emulate_cycle() {
+    cycles++;
+    *div = cycles >> 6;
 
     if (timaReloaded) {
         timaReloaded = false;
     }
-    if (timaScheduleCnt > 0) {
-        timaScheduleCnt--;
-        if (timaScheduleCnt == 0) {
-            if (timaWrote) {
-                timaWrote = false;
-            } else {
-                *tima = *tma;
-                memory->request_interrupt(Interrupt::TIMER_INT);
-                timaReloaded = true;
-            }
+    if (timaIntrSchedule) {
+        if (timaWrote) {
+            timaWrote = false;
+        } else {
+            *tima = *tma;
+            memory->request_interrupt(Interrupt::TIMER_INT);
+            timaReloaded = true;
         }
+        timaIntrSchedule = false;
     }
     try_trigger_tima();
 }
 
 void Timer::try_trigger_tima() {
-    bool newBitSet = (clocks >> bitFreq) & enabled;
+    bool newBitSet = (cycles >> bitFreq) & enabled;
     if (!newBitSet && oldBitSet) {
         (*tima)++;
         if (*tima == 0) {
-            timaScheduleCnt = 4;
+            timaIntrSchedule = true;
         }
     }
     oldBitSet = newBitSet;
@@ -65,11 +62,11 @@ void Timer::try_trigger_tima() {
 
 void Timer::reset_div() {
     *div = 0;
-    clocks = 0;
+    cycles = 0;
 }
 
 void Timer::write_tima(u8 newTima) {
-    if (timaScheduleCnt > 0) {
+    if (timaIntrSchedule) {
         timaWrote = true;
     }
     if (!timaReloaded) {
@@ -84,7 +81,7 @@ void Timer::write_tma(u8 newTma) {
     }
 }
 
-static constexpr u8 freqList[4] = {9, 3, 5, 7};
+static constexpr u8 freqList[4] = {7, 1, 3, 5};
 void Timer::write_tac(u8 newTac) {
     bitFreq = freqList[newTac & 0x3];
     this->enabled = (newTac & 0x4) != 0;

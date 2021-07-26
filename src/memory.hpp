@@ -33,6 +33,12 @@ public:
     u8 read(u16 addr);
     void write(u16 addr, u8 val);
 
+    bool is_double_speed() { return isDoubleSpeed; }
+    bool should_speed_switch() { return prepareSpeedSwitch; }
+    void start_speed_switch();
+    bool is_speed_switching();
+    void emulate_speed_switch_cycle();
+
     void emulate_dma_cycle();
 
     int get_elapsed_cycles();
@@ -56,6 +62,10 @@ private:
     using WRAMBank = u8[0x1000];
     WRAMBank* curWramBank;
     WRAMBank wramBanks[8];  // WRAM banks 1-7
+
+    bool isDoubleSpeed;
+    bool prepareSpeedSwitch;
+    int speedSwitchCycleCnt;
 
     bool dmaInProgress;
     bool scheduleDma;

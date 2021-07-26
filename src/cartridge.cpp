@@ -143,7 +143,6 @@ Cartridge::~Cartridge() {
             ram.insert(ram.begin() + (i * RAM_BANK_SIZE), std::begin(ramBanks[i]),
                        std::end(ramBanks[i]));
         }
-
         printf("Saving game to file: %s\n", info.savePath.c_str());
 
         std::ofstream saveFileStream(info.savePath, std::ios::binary);

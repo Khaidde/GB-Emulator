@@ -140,6 +140,7 @@ private:
     void try_trigger_stat();
 
     void handle_pixel_render();
+    u32 color_correction();
 
     void background_fetch();
     void sprite_fetch();
