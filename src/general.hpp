@@ -163,6 +163,10 @@ enum : u16 {
     // Wram bank number
     SVBK_REG = 0xFF70,
 
+    // Unused registers
+    PCM12_REG = 0xFF76,
+    PCM34_REG = 0xFF77,
+
     IE_REG = 0xFFFF,
 };
 }  // namespace IOReg

@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "debugger.hpp"
+
 namespace {
 // clang-format off
 constexpr const char* ROM_SIZES[] = {
@@ -49,7 +51,7 @@ Cartridge::Cartridge(CartridgeInfo& info, const char* cartName, int maxRomBanks,
         } else if (rom[0x143] == 0xC0) {
             printf("CGB Flag: only works on CGB\n");
         } else {
-            fatal("TODO implement DMG-mode on CGB");
+            printf("Warning: DMG-mode on CGB not fully implemented\n");
         }
     } else {
         for (int c = 0x134; c < 0x144; c++) {
@@ -62,6 +64,7 @@ Cartridge::Cartridge(CartridgeInfo& info, const char* cartName, int maxRomBanks,
         printf("Game supports SGB functions\n");
     }
 #endif
+    this->info.isCGBDmgMode = rom[0x143] != 0x80 && rom[0x143] != 0xC0;
 
     u8 romType = rom[0x148];
     if (romType <= 0x8) {
@@ -204,6 +207,7 @@ void ROMOnly::write(u16 addr, u8 val) {
 #if LOG
     printf("Warning: Attempting to write to rom only cartridge, addr=%02x val=%02x.\n", addr, val);
 #endif
+    debugger->pause_exec();
 }
 
 MBC1::MBC1(CartridgeInfo& info, u8* rom) : Cartridge(info, "MBC1", 128, 4, rom) {}

@@ -139,8 +139,8 @@ private:
 
     void try_trigger_stat();
 
+    u32 color_correction(u8 r, u8 g, u8 b);
     void handle_pixel_render();
-    u32 color_correction();
 
     void background_fetch();
     void sprite_fetch();

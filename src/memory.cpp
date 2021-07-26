@@ -15,9 +15,9 @@ constexpr u8 CGB_BOOT_IO[] = {
     0xFF, 0x00, 0x00, 0xBF, 0x77, 0xF3, 0xF1, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,  // FF20
     0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF,  // FF30
     0x91, 0x81, 0x00, 0x00, 0x90, 0x00, 0x00, 0xFC, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x7E, 0xFF, 0xFE,  // FF40
-    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x3E, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,  // FF50
-    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xC0, 0xFF, 0xC1, 0x8A, 0xFE, 0xFF, 0xFF, 0xFF,  // FF60
-    0xF8,
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,  // FF50
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xC8, 0xFF, 0xD0, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,  // FF60
+    0xFF, 0xFF, 0x00, 0x00, 0xFF, 0x8F, 0x00, 0x00,
 };
 // clang-format on
 }  // namespace
@@ -26,10 +26,10 @@ void Memory::restart() {
     curWramBank = &wramBanks[1];
 
     if (is_CGB()) {
-        for (int i = 0xFF00; i <= 0xFF70; i++) {
+        for (int i = 0xFF00; i < 0xFF78; i++) {
             mem[i] = CGB_BOOT_IO[i - 0xFF00];
         }
-        for (int i = 0xFF71; i < 0xFF80; i++) {
+        for (int i = 0xFF78; i < 0xFF80; i++) {
             mem[i] = 0xFF;
         }
     } else {
@@ -103,7 +103,7 @@ void Memory::write(u16 addr, u8 val) {
         ppu->write_vram(addr, val);
         return;
     }
-    if (0xC000 <= addr && addr < 0xD000) {
+    if (0xA000 <= addr && addr < 0xD000) {
         wramBanks[0][addr - 0xC000] = val;
         return;
     }
@@ -141,8 +141,16 @@ void Memory::write(u16 addr, u8 val) {
     if (0xFF27 <= addr && addr <= 0xFF30) {
         return;
     }
-    if (!is_CGB() && 0xFF4C <= addr && addr <= 0xFF7F) {
+    if (0xFF57 <= addr && addr <= 0xFF67) {
         return;
+    }
+    if (0xFF6D <= addr && addr <= 0xFF6F) {
+        return;
+    }
+    if (!is_CGB()) {
+        if (0xFF4C <= addr && addr <= 0xFF7F) {
+            return;
+        }
     }
     switch (addr) {
         case IOReg::JOYP_REG:
@@ -176,10 +184,6 @@ void Memory::write(u16 addr, u8 val) {
         case IOReg::LCDC_REG:
         case IOReg::STAT_REG:
         case IOReg::LYC_REG:
-        case IOReg::BGPI_REG:
-        case IOReg::BGPD_REG:
-        case IOReg::OBPI_REG:
-        case IOReg::OBPD_REG:
             ppu->write_register(addr, val);
             break;
         case IOReg::DMA_REG:
@@ -191,17 +195,22 @@ void Memory::write(u16 addr, u8 val) {
             dmaStartAddr = val << 8;
             mem[addr] = val;
             break;
+        case 0xFF4C:
+            break;
         case IOReg::KEY1_REG:
             if (val & 0x1) {
                 prepareSpeedSwitch = true;
             }
-            mem[addr] = (isDoubleSpeed << 7) | 0x7E | (val & 0x1);
+            break;
+        case 0xFF4E:
             break;
         case IOReg::VBK_REG:
-            if (is_CGB()) {
+            if (is_CGB_mode()) {
                 ppu->write_vbk(val);
                 mem[addr] = 0xFE | val;
             }
+            break;
+        case 0xFF50:
             break;
         case IOReg::HDMA1_REG:
         case IOReg::HDMA2_REG:
@@ -209,19 +218,34 @@ void Memory::write(u16 addr, u8 val) {
         case IOReg::HDMA4_REG:
         case IOReg::HDMA5_REG: {
             fatal("TODO Unimplemented hdma\n");
+            break;
         }
         case IOReg::RP_REG: {
             fatal("TODO Unimplemented infared communications port\n");
+            break;
         }
-        case IOReg::OPRI_REG: {
-            fatal("TODO test if opri is writable\n");
-        }
+        case IOReg::BGPI_REG:
+        case IOReg::BGPD_REG:
+        case IOReg::OBPI_REG:
+        case IOReg::OBPD_REG:
+            ppu->write_register(addr, val);
+            break;
+        case IOReg::OPRI_REG:
+            break;
         case IOReg::SVBK_REG:
             if (is_CGB()) {
                 u8 bank = (val & 0x7);
                 curWramBank = &wramBanks[bank == 0 ? 1 : bank];
                 mem[addr] = 0xF8 | val;
             }
+            break;
+        case 0xFF74:
+            break;
+        case 0xFF75:
+            mem[addr] = val | 0x8F;
+            break;
+        case IOReg::PCM12_REG:
+        case IOReg::PCM34_REG:
             break;
         default:
             mem[addr] = val;

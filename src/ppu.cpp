@@ -423,6 +423,18 @@ void PPU::try_trigger_stat() {
     prevIntrFlags = statIntrFlags;
 }
 
+// Color correction formula found at https://near.sh/articles/video/color-emulation
+// TODO calculate color correction when loaded into palette memory
+u32 PPU::color_correction(u8 r, u8 g, u8 b) {
+    int ri = r * 26 + g * 4 + b * 2;
+    int gi = g * 24 + b * 8;
+    int bi = r * 6 + g * 4 + b * 22;
+    u8 r8 = (ri > 0x3C0 ? 0x3C0 : ri) >> 2;
+    u8 g8 = (gi > 0x3C0 ? 0x3C0 : gi) >> 2;
+    u8 b8 = (bi > 0x3C0 ? 0x3C0 : bi) >> 2;
+    return 0xFF000000 | (u32)(r8 << 0x10) | (u32)(g8 << 0x8) | b8;
+}
+
 void PPU::handle_pixel_render() {
     if (fetcher.curSprite) {
         return;
@@ -462,7 +474,7 @@ void PPU::handle_pixel_render() {
         if (spriteFifo.size > 0) {
             SpriteFIFOData spritePxl = spriteFifo.pop_head();
             bool masterSpritePriority =
-                memory->is_CGB() && !get_lcdc_flag(LCDCFlag::BG_WINDOW_OR_PRIORITY_ENABLE);
+                memory->is_CGB_mode() && !get_lcdc_flag(LCDCFlag::BG_WINDOW_OR_PRIORITY_ENABLE);
             if (spritePxl.colIndex != 0) {
                 if (masterSpritePriority || (!bgPxl.priority && !spritePxl.priority) ||
                     colIndex == 0) {
@@ -475,7 +487,7 @@ void PPU::handle_pixel_render() {
 
         if (curPixelX >= 0) {
             u32 col;
-            if (memory->is_CGB()) {
+            if (memory->is_CGB_mode()) {
                 u8* paletteData = bgPaletteData;
                 if (isOBJPxl) {
                     paletteData = obPaletteData;
@@ -486,10 +498,7 @@ void PPU::handle_pixel_render() {
                 u8 r = colLo & 0x1F;
                 u8 g = ((colHi & 3) << 3) | ((colLo & 0xE0) >> 5);
                 u8 b = (colHi & 0x7C) >> 2;
-                r *= 0x100 / 0x20;
-                g *= 0x100 / 0x20;
-                b *= 0x100 / 0x20;
-                col = 0xFF000000 | (u32)(r << 0x10) | (u32)(g << 0x8) | b;
+                col = color_correction(r, g, b);
             } else {
                 u8 i = (colIndex & 0x3) << 1;
                 u8 mask = 3 << i;
@@ -529,7 +538,7 @@ void PPU::background_fetch() {
             u16 tileIndexAddr = (tileX + tileY * TILESET_SIZE) + tileMap;
             fetcher.tileIndex = tileMapVram[tileIndexAddr];
 
-            if (memory->is_CGB()) {
+            if (memory->is_CGB_mode()) {
                 fetcher.tileAttribs = tileAttribVram[tileIndexAddr];
             }
         } break;
@@ -540,7 +549,7 @@ void PPU::background_fetch() {
             } else {
                 tileByteAddr = (u16)(0x1000 + (s8)fetcher.tileIndex * TILE_MEM_LEN);
             }
-            if (memory->is_CGB()) {
+            if (memory->is_CGB_mode()) {
                 u8 y = fetcher.yOff & 0x7;
                 if (fetcher.tileAttribs & (1 << 6)) {
                     tileByteAddr += (y ^ 0x7) << 1;
@@ -551,8 +560,8 @@ void PPU::background_fetch() {
                 tileByteAddr += (fetcher.yOff % TILE_PX_SIZE) << 1;
             }
             fetcher.data0 =
-                ((fetcher.tileAttribs & 0x8 && memory->is_CGB()) ? tileAttribVram
-                                                                 : tileMapVram)[tileByteAddr];
+                ((fetcher.tileAttribs & 0x8 && memory->is_CGB_mode()) ? tileAttribVram
+                                                                      : tileMapVram)[tileByteAddr];
         } break;
         case Fetcher::READ_TILE_1: {
             u16 tileByteAddr;
@@ -561,7 +570,7 @@ void PPU::background_fetch() {
             } else {
                 tileByteAddr = (u16)(0x1000 + (s8)fetcher.tileIndex * TILE_MEM_LEN);
             }
-            if (memory->is_CGB()) {
+            if (memory->is_CGB_mode()) {
                 u8 y = fetcher.yOff & 0x7;
                 if (fetcher.tileAttribs & (1 << 6)) {
                     tileByteAddr += (y ^ 0x7) << 1;
@@ -571,20 +580,21 @@ void PPU::background_fetch() {
             } else {
                 tileByteAddr += (fetcher.yOff % TILE_PX_SIZE) << 1;
             }
-            fetcher.data1 =
-                ((fetcher.tileAttribs & 0x8 && memory->is_CGB()) ? tileAttribVram
-                                                                 : tileMapVram)[tileByteAddr + 1];
+            fetcher.data1 = ((fetcher.tileAttribs & 0x8 && memory->is_CGB_mode())
+                                 ? tileAttribVram
+                                 : tileMapVram)[tileByteAddr + 1];
         }
         case Fetcher::PUSH:
             if (bgFifo.size == 0) {
                 u8 palette;
-                if (memory->is_CGB()) {
+                if (memory->is_CGB_mode()) {
                     palette = fetcher.tileAttribs & 0x7;
                 } else {
                     palette = DMGPalette::BGP;
                 }
-                bool priority = memory->is_CGB() && fetcher.tileAttribs & (1 << 7);
-                if (memory->is_CGB() || get_lcdc_flag(LCDCFlag::BG_WINDOW_OR_PRIORITY_ENABLE)) {
+                bool priority = memory->is_CGB_mode() && fetcher.tileAttribs & (1 << 7);
+                if (memory->is_CGB_mode() ||
+                    get_lcdc_flag(LCDCFlag::BG_WINDOW_OR_PRIORITY_ENABLE)) {
                     bool xFlip = fetcher.tileAttribs & (1 << 5);
                     for (int i = 0; i < TILE_PX_SIZE; i++) {
                         u8 align = xFlip ? (1 << i) : (1 << 7) >> i;
@@ -624,9 +634,9 @@ void PPU::sprite_fetch() {
             } else {
                 tileByteAddr += y << 1;
             }
-            fetcher.data0 =
-                ((fetcher.curSprite->flags & 0x8 && memory->is_CGB()) ? tileAttribVram
-                                                                      : tileMapVram)[tileByteAddr];
+            fetcher.data0 = ((fetcher.curSprite->flags & 0x8 && memory->is_CGB_mode())
+                                 ? tileAttribVram
+                                 : tileMapVram)[tileByteAddr];
         } break;
         case Fetcher::READ_TILE_1: {
             u16 tileByteAddr = fetcher.curSprite->tileID * TILE_MEM_LEN;
@@ -637,14 +647,14 @@ void PPU::sprite_fetch() {
             } else {
                 tileByteAddr += y << 1;
             }
-            fetcher.data1 = ((fetcher.curSprite->flags & 0x8 && memory->is_CGB())
+            fetcher.data1 = ((fetcher.curSprite->flags & 0x8 && memory->is_CGB_mode())
                                  ? tileAttribVram
                                  : tileMapVram)[tileByteAddr + 1];
         }
         case Fetcher::PUSH: {
             bool bgPriority = fetcher.curSprite->flags & (1 << 7);
             u8 palette;
-            if (memory->is_CGB()) {
+            if (memory->is_CGB_mode()) {
                 palette = fetcher.curSprite->flags & 0x7;
             } else {
                 palette = ((fetcher.curSprite->flags & (1 << 4)) != 0) + DMGPalette::OBP0;
@@ -683,5 +693,5 @@ bool PPU::get_lcdc_flag(LCDCFlag flag) { return *lcdc & (1 << (u8)flag); }
 
 bool PPU::is_window_enabled() {
     return get_lcdc_flag(LCDCFlag::WINDOW_ENABLE) &&
-           (memory->is_CGB() || get_lcdc_flag(LCDCFlag::BG_WINDOW_OR_PRIORITY_ENABLE));
+           (memory->is_CGB_mode() || get_lcdc_flag(LCDCFlag::BG_WINDOW_OR_PRIORITY_ENABLE));
 }
