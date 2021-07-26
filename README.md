@@ -9,7 +9,6 @@ A Gameboy/Gameboy Color emulator aimed at accuracy. This project is meant to be 
 -   MBC3
 -   Serial
 -   HDMA
--   Double speed mode
 -   Infared sensor
 -   Command-line parser
 
@@ -142,7 +141,7 @@ Note: Build has only been tested on 64-bit Windows 10
 | ----------------------- | :----: | ---- |
 | add_sp_e_timing         |   x    |      |
 | boot_div-dmgABCmgb      |   x    |      |
-| boot_hwio-dmgABCmgb     |        |      |
+| boot_hwio-dmgABCmgb     |   x    |      |
 | boot_regs-dmgABC        |   x    |      |
 | call_cc_timing          |   x    |      |
 | call_cc_timing2         |   x    |      |

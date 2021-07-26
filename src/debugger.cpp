@@ -282,12 +282,13 @@ std::string Debugger::disassemble(u16 pc) {
         char byteChar[20];
         sprintf(byteChar, "%02x", byte1);
         diss.replace(bytePos, 1, byteChar);
-    }
-    size_t wordPos = diss.find("2");
-    if (wordPos != std::string::npos) {
-        char wordChar[20];
-        sprintf(wordChar, "%04x", byte1 | (byte2 << 8));
-        diss.replace(wordPos, 2, wordChar);
+    } else {
+        size_t wordPos = diss.find("2");
+        if (wordPos != std::string::npos) {
+            char wordChar[20];
+            sprintf(wordChar, "%04x", byte1 | (byte2 << 8));
+            diss.replace(wordPos, 2, wordChar);
+        }
     }
     return diss;
 }

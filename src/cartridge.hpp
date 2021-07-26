@@ -2,12 +2,10 @@
 
 #include "general.hpp"
 
-class Debugger;
-
 struct CartridgeInfo {
     std::string savePath;
     bool isCGB;
-    bool isCGBDmgMode;
+    bool cgbMode;  // 1 - CGB-Mode, 0 - DMG-Mode
 
     bool hasRam = false;
     bool hasBattery = false;
@@ -20,8 +18,6 @@ public:
     Cartridge(CartridgeInfo& info, const char* cartName, int maxRomBanks, int maxRamBanks, u8* rom);
     virtual ~Cartridge();
 
-    void set_debugger(Debugger& debugger) { this->debugger = &debugger; }
-
     void try_load_save_file();
 
     virtual void write(u16 addr, u8 val) = 0;
@@ -30,10 +26,10 @@ public:
     virtual u8 read_ram(u16 addr);
 
     bool is_CGB() { return info.isCGB; }
-    bool is_CGB_mode() { return info.isCGB && !info.isCGBDmgMode; }
+    bool is_CGB_mode() { return info.isCGB && info.cgbMode; }
+    bool is_DMG_mode() { return info.isCGB && !info.cgbMode; }
 
 protected:
-    Debugger* debugger;
     CartridgeInfo info;
 
     static constexpr u16 ROM_BANK_SIZE = 0x4000;

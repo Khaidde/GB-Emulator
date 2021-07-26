@@ -22,6 +22,7 @@ struct SampleQueue {
 template <int maxLoad>
 class LengthCounter {
 public:
+    void restart();
     void set_disable_target(bool& enabled);
     void set_length_enabled(bool enabled);
     void set_load(u8 lengthLoad);
@@ -36,12 +37,12 @@ private:
 
     bool lengthEnabled = false;
 
-    u16 lengthCnt;
-    u16 cycleLen;
+    u16 lengthCnt = 0;
 };
 
 class VolumeEnvelope {
 public:
+    void restart();
     void write_volume_registers(u8 val);
 
     void trigger();
@@ -61,6 +62,7 @@ private:
 class SquareChannel {
 public:
     SquareChannel();
+    void restart();
     void write_registers(char regType, u8 val);
     void update_frequency();
 
@@ -69,6 +71,7 @@ public:
     void emulate_volume_clock();
     void emulate_clock();
 
+    void boot_length_counter();
     bool is_length_active();
 
     u8 get_left_vol();
@@ -106,6 +109,7 @@ private:
 class WaveChannel {
 public:
     WaveChannel();
+    void restart();
     void set_samples(u8* samples);
     void write_registers(char regType, u8 val);
     void update_frequency();
@@ -143,6 +147,7 @@ private:
 class NoiseChannel {
 public:
     NoiseChannel();
+    void restart();
     void write_registers(char regType, u8 val);
 
     void emulate_length_clock();

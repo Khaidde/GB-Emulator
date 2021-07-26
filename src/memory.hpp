@@ -18,18 +18,8 @@ class APU;
 class Memory {
 public:
     void restart();
-    void set_cartridge(Cartridge* cartridge) {
-        this->cartridge = cartridge;
-        if (debugger != nullptr) {
-            this->cartridge->set_debugger(*debugger);
-        }
-    }
-    void set_debugger(Debugger& debugger) {
-        this->debugger = &debugger;
-        if (cartridge != nullptr) {
-            this->cartridge->set_debugger(debugger);
-        }
-    }
+    void set_cartridge(Cartridge* cartridge) { this->cartridge = cartridge; }
+    void set_debugger(Debugger& debugger) { this->debugger = &debugger; }
     void set_input(Input& in) { this->input = &in; }
     void set_timer(Timer& time) { this->timer = &time; }
     void set_apu(APU& a) { this->apu = &a; }
@@ -37,6 +27,7 @@ public:
 
     bool is_CGB() { return cartridge->is_CGB(); }
     bool is_CGB_mode() { return cartridge->is_CGB_mode(); }
+    bool is_DMG_mode() { return cartridge->is_DMG_mode(); }
 
     void request_interrupt(Interrupt interrupt);
 
@@ -58,9 +49,9 @@ public:
 
 private:
     friend class Debugger;
-    Debugger* debugger = nullptr;
+    Debugger* debugger;
 
-    Cartridge* cartridge = nullptr;
+    Cartridge* cartridge;
 
     Input* input;
     Timer* timer;

@@ -3,6 +3,12 @@
 #include "memory.hpp"
 
 template <int maxLoad>
+void LengthCounter<maxLoad>::restart() {
+    lengthEnabled = false;
+    lengthCnt = 0;
+}
+
+template <int maxLoad>
 void LengthCounter<maxLoad>::set_disable_target(bool& enabled) {
     this->enabled = &enabled;
 }
@@ -14,8 +20,7 @@ void LengthCounter<maxLoad>::set_length_enabled(bool enabled) {
 
 template <int maxLoad>
 void LengthCounter<maxLoad>::set_load(u8 lengthLoad) {
-    cycleLen = maxLoad - lengthLoad;
-    lengthCnt = cycleLen;
+    lengthCnt = maxLoad - lengthLoad;
 }
 
 template <int maxLoad>
@@ -38,6 +43,15 @@ void LengthCounter<maxLoad>::emulate_clock() {
 template <int maxLoad>
 bool LengthCounter<maxLoad>::is_active() {
     return lengthCnt > 0;
+}
+
+void VolumeEnvelope::restart() {
+    volume = 0;
+    startingVolume = 0;
+    volumeAddMode = false;
+
+    envelopeCnt = 0;
+    clockLen = 0;
 }
 
 void VolumeEnvelope::write_volume_registers(u8 val) {
@@ -64,6 +78,11 @@ void VolumeEnvelope::emulate_clock() {
 u8 VolumeEnvelope::get_volume() { return volume; }
 
 SquareChannel::SquareChannel() { lengthCounter.set_disable_target(enabled); }
+
+void SquareChannel::restart() {
+    lengthCounter.restart();
+    volumeEnvelope.restart();
+}
 
 void SquareChannel::write_registers(char regType, u8 val) {
     switch (regType) {
@@ -159,6 +178,8 @@ void SquareChannel::emulate_clock() {
     }
 }
 
+void SquareChannel::boot_length_counter() { lengthCounter.set_load(0); }
+
 bool SquareChannel::is_length_active() { return lengthCounter.is_active(); }
 
 u8 SquareChannel::get_left_vol() { return outVol * leftEnable; }
@@ -166,6 +187,8 @@ u8 SquareChannel::get_left_vol() { return outVol * leftEnable; }
 u8 SquareChannel::get_right_vol() { return outVol * rightEnable; }
 
 WaveChannel::WaveChannel() { lengthCounter.set_disable_target(enabled); }
+
+void WaveChannel::restart() { lengthCounter.restart(); }
 
 void WaveChannel::set_samples(u8* samples) { this->samples = samples; }
 
@@ -235,6 +258,11 @@ u8 WaveChannel::get_right_vol() { return outVol * rightEnable; }
 
 NoiseChannel::NoiseChannel() { lengthCounter.set_disable_target(enabled); }
 
+void NoiseChannel::restart() {
+    lengthCounter.restart();
+    volumeEnvelope.restart();
+}
+
 void NoiseChannel::write_registers(char regType, u8 val) {
     switch (regType) {
         case 1:
@@ -296,24 +324,13 @@ APU::APU(Memory& memory) : memory(&memory) {
 }
 
 void APU::restart() {
-    memory->ref(IOReg::NR10_REG) = 0x80;
-    memory->ref(IOReg::NR11_REG) = 0xBF;
-    memory->ref(IOReg::NR12_REG) = 0xF3;
-    memory->ref(IOReg::NR13_REG) = 0xC1;
-    memory->ref(IOReg::NR14_REG) = 0xBF;
+    square1.restart();
+    square2.restart();
+    wave.restart();
+    noise.restart();
 
-    // TODO figure out how to exhaust length counter in square2
-    memory->ref(IOReg::NR21_REG) = 0x3F;
-
-    memory->ref(IOReg::NR30_REG) = 0x7F;
-    memory->ref(IOReg::NR32_REG) = 0x9F;
-    memory->ref(IOReg::NR34_REG) = 0xBF;
-
-    memory->ref(IOReg::NR43_REG) = 0x00;
-
-    memory->ref(IOReg::NR50_REG) = 0x77;
-    memory->ref(IOReg::NR51_REG) = 0xF3;
-    memory->ref(IOReg::NR52_REG) = 0xF1;
+    // Simulate initial length counter after boot rom
+    square1.boot_length_counter();
 
     frameSequenceClocks = 0;
     downSampleCnt = 0;
