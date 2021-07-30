@@ -13,7 +13,7 @@ struct SampleQueue {
         return val;
     }
 
-    static constexpr short CAPACITY = 2048;
+    static constexpr short CAPACITY = 4096;
     u16 offset = 0;
     u32 size = 0;
     s16 data[CAPACITY];
@@ -63,6 +63,8 @@ class SquareChannel {
 public:
     SquareChannel();
     void restart();
+    void power_off();
+
     void write_registers(char regType, u8 val);
     void update_frequency();
 
@@ -74,6 +76,7 @@ public:
     void boot_length_counter();
     bool is_length_active();
 
+    u8 get_pcm();
     u8 get_left_vol();
     u8 get_right_vol();
 
@@ -119,6 +122,7 @@ public:
 
     bool is_length_active();
 
+    u8 get_amplitude();
     u8 get_left_vol();
     u8 get_right_vol();
 
@@ -156,6 +160,7 @@ public:
 
     bool is_length_active();
 
+    u8 get_amplitude();
     u8 get_left_vol();
     u8 get_right_vol();
 
@@ -188,6 +193,9 @@ public:
     u8 read_register(u8 originalVal, u8 ioReg);
     void write_register(u8 ioReg, u8 val);
 
+    u8 read_pcm12();
+    u8 read_pcm34();
+
 private:
     Memory* memory;
 
@@ -203,4 +211,6 @@ private:
 
     u8 leftVol;
     u8 rightVol;
+
+    bool isPowerOn;
 };

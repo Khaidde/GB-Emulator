@@ -82,7 +82,7 @@ int main(int argc, char** argv) {
     try {
         if (argc == 1) {
             const std::vector<std::string> testRomPaths = {
-                // "SameSuite",
+                // "SameSuite\\apu\\channel_1",
                 "mooneye-gb_hwtests\\acceptance",
                 // "mooneye-gb_hwtests\\acceptance\\ppu",
                 // "mooneye-gb_hwtests\\emulator-only",

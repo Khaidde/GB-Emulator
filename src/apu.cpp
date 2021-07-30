@@ -82,6 +82,9 @@ SquareChannel::SquareChannel() { lengthCounter.set_disable_target(enabled); }
 void SquareChannel::restart() {
     lengthCounter.restart();
     volumeEnvelope.restart();
+    cycleIndex = 0;
+    clockCnt = 0;
+    clockLen = 0;
 }
 
 void SquareChannel::write_registers(char regType, u8 val) {
@@ -113,7 +116,6 @@ void SquareChannel::write_registers(char regType, u8 val) {
                 volumeEnvelope.trigger();
 
                 shadowFrequency = frequency;
-                clockLen = (2048 - frequency) << 2;
                 clockCnt = (clockLen & 0xFFFC) | (clockCnt & 0x3);
                 sweepEnabled = (sweepShift > 0 || sweepClockLen > 0);
                 sweepClockCnt = sweepClockLen;
@@ -181,6 +183,8 @@ void SquareChannel::emulate_clock() {
 void SquareChannel::boot_length_counter() { lengthCounter.set_load(0); }
 
 bool SquareChannel::is_length_active() { return lengthCounter.is_active(); }
+
+u8 SquareChannel::get_pcm() { return outVol; }
 
 u8 SquareChannel::get_left_vol() { return outVol * leftEnable; }
 
@@ -252,6 +256,8 @@ void WaveChannel::emulate_clock() {
 
 bool WaveChannel::is_length_active() { return lengthCounter.is_active(); }
 
+u8 WaveChannel::get_amplitude() { return outVol; }
+
 u8 WaveChannel::get_left_vol() { return outVol * leftEnable; }
 
 u8 WaveChannel::get_right_vol() { return outVol * rightEnable; }
@@ -273,10 +279,13 @@ void NoiseChannel::write_registers(char regType, u8 val) {
             volumeEnvelope.write_volume_registers(val);
             break;
         case 3: {
-            u8 divisor = 16 * (val & 0x7);
+            u8 divisor = (val & 0x7) << 4;
             if (divisor == 0) divisor = 8;
             widthMode = (val & 0x8) != 0;
             clockLen = divisor << (val >> 4);
+            if (val >> 4 >= 14) {
+                clockLen = 0;
+            }
             clockEnabled = (val >> 4) < 14;
         } break;
         case 4:
@@ -302,10 +311,10 @@ void NoiseChannel::emulate_clock() {
         if (clockCnt == 0) {
             clockCnt = clockLen;
 
-            u8 res = ((lsfr >> 1) ^ lsfr) & 0x1;
-            lsfr = (res << 14) | (lsfr >> 1);
+            bool res = ((lsfr >> 1) ^ lsfr) & 0x1;
+            lsfr = (res << 14) | ((lsfr >> 1) & 0x3FFF);
             if (widthMode) {
-                lsfr = (lsfr & ~0x0040) | (res << 6);
+                lsfr = (lsfr & 0xFFBF) | (res << 6);
             }
 
             outVol = enabled * dacEnabled * volumeEnvelope.get_volume() * ((lsfr & 0x1) == 0);
@@ -314,6 +323,8 @@ void NoiseChannel::emulate_clock() {
 }
 
 bool NoiseChannel::is_length_active() { return lengthCounter.is_active(); }
+
+u8 NoiseChannel::get_amplitude() { return outVol; }
 
 u8 NoiseChannel::get_left_vol() { return outVol * leftEnable; }
 
@@ -334,6 +345,8 @@ void APU::restart() {
 
     frameSequenceClocks = 0;
     downSampleCnt = 0;
+
+    isPowerOn = true;
 }
 
 void APU::sample(s16* sampleBuffer, u16 sampleLen) {
@@ -345,12 +358,15 @@ void APU::sample(s16* sampleBuffer, u16 sampleLen) {
 }
 
 constexpr double CLOCKS_PER_SAMPLE =
-    70224.0 / (Constants::SAMPLE_RATE / (1000.0 / Constants::MS_PER_FRAME));
+    PPU::TOTAL_CLOCKS / (Constants::SAMPLE_RATE / (1000.0 / Constants::MS_PER_FRAME));
 void APU::emulate_clock() {
+    if (!isPowerOn) {
+        return;
+    }
     frameSequenceClocks++;
     if (frameSequenceClocks == 8192) {
         frameSequenceClocks = 0;
-        if ((frameSequenceStep & 0x1) == 0) {
+        if ((frameSequenceStep & 0x1) == 0x0) {
             square1.emulate_length_clock();
             square2.emulate_length_clock();
             wave.emulate_length_clock();
@@ -359,7 +375,7 @@ void APU::emulate_clock() {
         if ((frameSequenceStep & 0x3) == 0x2) {
             square1.emulate_sweep_clock();
         }
-        if (frameSequenceStep == 7) {
+        if (frameSequenceStep == 0x7) {
             square1.emulate_volume_clock();
             square2.emulate_volume_clock();
             noise.emulate_volume_clock();
@@ -403,7 +419,7 @@ u8 APU::read_register(u8 originalVal, u8 ioReg) {
         return originalVal;
     }
     if (ioReg == 0x26) {
-        u8 res = (originalVal & 0x80) | 0x70;
+        u8 res = (isPowerOn << 7) | 0x70;
         res |= square1.is_length_active();
         res |= square2.is_length_active() << 1;
         res |= wave.is_length_active() << 2;
@@ -414,9 +430,32 @@ u8 APU::read_register(u8 originalVal, u8 ioReg) {
 }
 
 void APU::write_register(u8 ioReg, u8 val) {
+    if (ioReg == 0x26) {
+        isPowerOn = val & 0x80;
+        if (!isPowerOn) {
+            for (int i = 0xFF10; i <= 0xFF25; i++) {
+                memory->write(i, 0);
+            }
+            square1.restart();
+            square2.restart();
+
+            leftVol = 1 << 4;
+            rightVol = 1 << 4;
+            square1.leftEnable = square1.rightEnable = false;
+            square2.leftEnable = square2.rightEnable = false;
+            wave.leftEnable = wave.rightEnable = false;
+            noise.leftEnable = noise.rightEnable = false;
+
+            frameSequenceClocks = 0;
+            downSampleCnt = 0;
+        }
+    }
+    if (!isPowerOn) {
+        return;
+    }
     if (ioReg == 0x24) {
-        leftVol = (1 + ((val & 0x70) >> 4)) * 16;
-        rightVol = (1 + (val & 0x7)) * 16;
+        leftVol = (1 + ((val & 0x70) >> 4)) << 4;
+        rightVol = (1 + (val & 0x7)) << 4;
     } else if (ioReg == 0x25) {
         square1.leftEnable = val & 0x10;
         square2.leftEnable = val & 0x20;
@@ -446,3 +485,7 @@ void APU::write_register(u8 ioReg, u8 val) {
         }
     }
 }
+
+u8 APU::read_pcm12() { return square1.get_pcm() | square2.get_pcm() << 4; }
+
+u8 APU::read_pcm34() { return wave.get_amplitude() | noise.get_amplitude() << 4; }

@@ -104,6 +104,14 @@ u8 Memory::read(u16 addr) {
     if (0xFF10 <= addr && addr <= 0xFF26) {
         return apu->read_register(mem[addr], addr & 0xFF);
     }
+    if (is_CGB_mode()) {
+        if (addr == 0xFF76) {
+            return apu->read_pcm12();
+        }
+        if (addr == 0xFF77) {
+            return apu->read_pcm34();
+        }
+    }
     if (addr == IOReg::JOYP_REG) {
         return input->get_key_state(mem[addr]);
     }
@@ -321,7 +329,7 @@ void Memory::reset_elapsed_cycles() { elapsedCycles -= PPU::TOTAL_CLOCKS << isDo
 void Memory::sleep_cycle() {
     emulate_dma_cycle();
     timer->emulate_cycle();
-    for (int i = 0; i < 4 >> (is_CGB() && isDoubleSpeed); i++) {
+    for (int i = 0; i < 4 >> (is_CGB_mode() && isDoubleSpeed); i++) {
         apu->emulate_clock();
         ppu->emulate_clock();
     }

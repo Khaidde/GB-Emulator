@@ -52,7 +52,7 @@ constexpr int HEIGHT = 144;
 
 constexpr double MS_PER_FRAME = 16.7427;
 
-constexpr double MASTER_VOLUME = 0.5;
+constexpr double MASTER_VOLUME = 3.5;
 constexpr int SAMPLE_RATE = 48000;
 
 }  // namespace Constants
