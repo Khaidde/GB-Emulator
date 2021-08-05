@@ -65,9 +65,8 @@ void CPU::handle_interrupts() {
 }
 
 void CPU::fetch_execute() {
-    if (memory->is_speed_switching()) {
+    if (memory->is_speed_switching() || memory->is_hdma_ongoing()) {
         memory->sleep_cycle();
-        memory->emulate_speed_switch_cycle();
         return;
     }
 
@@ -84,6 +83,7 @@ void CPU::fetch_execute() {
     // PAUSE_EXEC(this, debugger, 0x48);
     // PAUSE_EXEC(this, debugger, 0x217);
     // PAUSE_EXEC(this, debugger, 0x610);
+    // PAUSE_EXEC(this, debugger, 0x4C42);
 #endif
 
     if (debugger->is_paused()) {

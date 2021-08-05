@@ -19,7 +19,7 @@ constexpr u8 CGB_BOOT_IO[] = {
     0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF,  // FF30
     0x91, 0x81, 0x00, 0x00, 0x90, 0x00, 0x00, 0xFC, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x7E, 0xFF, 0xFE,  // FF40
     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,  // FF50
-    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xC8, 0xFF, 0xD0, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,  // FF60
+    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xC8, 0xFF, 0xD0, 0xFF, 0xFE, 0xFF, 0xFF, 0xFF,  // FF60
     0xFF, 0xFF, 0x00, 0x00, 0xFF, 0x8F, 0x00, 0x00,
 };
 // clang-format on
@@ -65,6 +65,11 @@ void Memory::restart() {
     dmaInProgress = false;
     scheduleDma = false;
     dmaCycleCnt = 0;
+
+    hdmaSource = 0xFFF0;
+    hdmaDest = 0x9FF0;
+    hdmaLen = 0x800;
+    hdma2ClockCnt = 0;
 
     elapsedCycles = 0;
 }
@@ -243,18 +248,51 @@ void Memory::write(u16 addr, u8 val) {
         case 0xFF50:
             break;
         case IOReg::HDMA1_REG:
+            hdmaSource = (val << 8) | (hdmaSource & 0xFF);
+            break;
         case IOReg::HDMA2_REG:
+            hdmaSource = (hdmaSource & 0xFF00) | (val & 0xF0);
+            break;
         case IOReg::HDMA3_REG:
+            hdmaDest = 0x8000 | (val & 0x1F) << 8 | (hdmaDest & 0xFF);
+            break;
         case IOReg::HDMA4_REG:
+            hdmaDest = (hdmaDest & 0xFF00) | (val & 0xF0);
+            break;
         case IOReg::HDMA5_REG: {
             if (is_CGB_mode()) {
-                fatal("TODO Unimplemented hdma\n");
+                if ((hdmaSource >= 0x8000 && hdmaSource < 0xA000) || hdmaSource > 0xDFF0) {
+                    fatal("TODO Unverified hdma source - %04x\n", hdmaSource);
+                }
+                if (is_hdma_ongoing()) {
+                    fatal("TODO unimplemented start hdma while already ongoing\n");
+                }
+                if (val & 0x80) {
+                    fatal("TODO unimplemented HBLANK DMA\n");
+                } else {
+                    hdmaLen = ((val & 0x7F) + 1) << 4;
+                    hdma2ClockCnt = hdmaLen;
+                }
             }
             break;
         }
         case IOReg::RP_REG: {
             if (is_CGB_mode()) {
-                fatal("TODO Unimplemented infared communications port\n");
+                // Emulates IR port as if there is no external read
+                // IR port details: https://shonumi.github.io/dandocs.html#ir
+#if DEBUG && LOG
+                if (val & 0x1) {
+                    printf("Infared light ON\n");
+                } else {
+                    printf("Infared light OFF\n");
+                }
+                if (val >> 6) {
+                    printf("Infared port read enabled\n");
+                } else {
+                    printf("Infared port read disabled\n");
+                }
+#endif
+                mem[addr] = (val & 0xC1) | 0x3E;
             }
             break;
         }
@@ -296,11 +334,16 @@ void Memory::start_speed_switch() {
 bool Memory::is_speed_switching() { return speedSwitchCycleCnt > 0; }
 
 void Memory::emulate_speed_switch_cycle() {
-    speedSwitchCycleCnt--;
-    if (speedSwitchCycleCnt == 0) {
-        isDoubleSpeed = !isDoubleSpeed;
-        prepareSpeedSwitch = false;
-        mem[IOReg::KEY1_REG] = (isDoubleSpeed << 7) | 0x7E;
+    if (is_speed_switching()) {
+        speedSwitchCycleCnt--;
+        if (speedSwitchCycleCnt == 0) {
+            isDoubleSpeed = !isDoubleSpeed;
+            prepareSpeedSwitch = false;
+            mem[IOReg::KEY1_REG] = (isDoubleSpeed << 7) | 0x7E;
+#if DEBUG && LOG
+            printf("Speed switch to %d\n", isDoubleSpeed);
+#endif
+        }
     }
 }
 
@@ -322,6 +365,22 @@ void Memory::emulate_dma_cycle() {
     }
 }
 
+bool Memory::is_hdma_ongoing() { return hdma2ClockCnt > 0; }
+
+void Memory::emulate_hdma_2clock() {
+    if (is_hdma_ongoing()) {
+        u16 i = hdmaLen - hdma2ClockCnt;
+        if ((hdmaDest + i) >> 16 || (hdmaSource + i) >> 16) {
+            fatal("TODO hdma source/dest overflow");
+        }
+        write(hdmaDest + i, read(hdmaSource + i));
+        hdma2ClockCnt--;
+        if (hdma2ClockCnt == 0) {
+            mem[IOReg::HDMA5_REG] = 0xFF;
+        }
+    }
+}
+
 int Memory::get_elapsed_cycles() { return elapsedCycles; }
 
 void Memory::reset_elapsed_cycles() { elapsedCycles -= PPU::TOTAL_CLOCKS << isDoubleSpeed; }
@@ -332,6 +391,10 @@ void Memory::sleep_cycle() {
     for (int i = 0; i < 4 >> (is_CGB_mode() && isDoubleSpeed); i++) {
         apu->emulate_clock();
         ppu->emulate_clock();
+        if (i % 2 == 1) {
+            emulate_hdma_2clock();
+        }
     }
+    emulate_speed_switch_cycle();
     elapsedCycles += 4;
 }

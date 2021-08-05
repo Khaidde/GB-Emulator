@@ -39,13 +39,17 @@ public:
     bool should_speed_switch() { return prepareSpeedSwitch; }
     void start_speed_switch();
     bool is_speed_switching();
-    void emulate_speed_switch_cycle();
 
-    void emulate_dma_cycle();
+    bool is_hdma_ongoing();
 
     int get_elapsed_cycles();
     void reset_elapsed_cycles();
     void sleep_cycle();
+
+private:
+    void emulate_speed_switch_cycle();
+    void emulate_dma_cycle();
+    void emulate_hdma_2clock();
 
 private:
     friend class Debugger;
@@ -73,6 +77,11 @@ private:
     bool scheduleDma;
     u16 dmaStartAddr;
     u8 dmaCycleCnt;
+
+    u16 hdmaSource;
+    u16 hdmaDest;
+    u16 hdmaLen;
+    u16 hdma2ClockCnt;
 
     int elapsedCycles;
 };
