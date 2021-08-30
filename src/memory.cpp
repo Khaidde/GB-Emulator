@@ -68,6 +68,8 @@ void Memory::restart() {
 
     hdmaSource = 0xFFF0;
     hdmaDest = 0x9FF0;
+    hdmaBytesLeft = 0;
+    hdmaBytesTransferred = 0;
     hdmaLen = 0x800;
     hdma2ClockCnt = 0;
 
@@ -248,29 +250,51 @@ void Memory::write(u16 addr, u8 val) {
         case 0xFF50:
             break;
         case IOReg::HDMA1_REG:
-            hdmaSource = (val << 8) | (hdmaSource & 0xFF);
+            if (hdmaBytesLeft == 0) {
+                hdmaSource = (val << 8) | (hdmaSource & 0xFF);
+            } else {
+                fatal("TODO Unimplemented hdmasource write during hblank dma\n");
+            }
             break;
         case IOReg::HDMA2_REG:
-            hdmaSource = (hdmaSource & 0xFF00) | (val & 0xF0);
+            if (hdmaBytesLeft == 0) {
+                hdmaSource = (hdmaSource & 0xFF00) | (val & 0xF0);
+            } else {
+                fatal("TODO Unimplemented hdmasource write during hblank dma\n");
+            }
             break;
         case IOReg::HDMA3_REG:
-            hdmaDest = 0x8000 | (val & 0x1F) << 8 | (hdmaDest & 0xFF);
+            if (hdmaBytesLeft == 0) {
+                hdmaDest = 0x8000 | (val & 0x1F) << 8 | (hdmaDest & 0xFF);
+            } else {
+                fatal("TODO Unimplemented hdmadest write during hblank dma\n");
+            }
             break;
         case IOReg::HDMA4_REG:
-            hdmaDest = (hdmaDest & 0xFF00) | (val & 0xF0);
+            if (hdmaBytesLeft == 0) {
+                hdmaDest = (hdmaDest & 0xFF00) | (val & 0xF0);
+            } else {
+                fatal("TODO Unimplemented hdmadest write during hblank dma\n");
+            }
             break;
         case IOReg::HDMA5_REG: {
             if (is_CGB_mode()) {
+                if (hdmaBytesLeft > 0 && (val & 0x80) == 0) {
+                    hdmaBytesLeft = 0;
+                    break;
+                }
                 if ((hdmaSource >= 0x8000 && hdmaSource < 0xA000) || hdmaSource > 0xDFF0) {
                     fatal("TODO Unverified hdma source - %04x\n", hdmaSource);
                 }
-                if (is_hdma_ongoing()) {
-                    fatal("TODO unimplemented start hdma while already ongoing\n");
-                }
+                hdmaBytesLeft = ((val & 0x7F) + 1) << 4;
                 if (val & 0x80) {
-                    fatal("TODO unimplemented HBLANK DMA\n");
+                    // TODO according to Antonio docs and BGB, there is a 4 clock (1 nop) fixed
+                    // setup overhead
+                    fatal("TODO hblank dma is disabled since it needs to be tested more\n");
+                    continue_hblank_dma();
+                    mem[IOReg::HDMA5_REG] &= ~0x80;
                 } else {
-                    hdmaLen = ((val & 0x7F) + 1) << 4;
+                    hdmaLen = hdmaBytesLeft;
                     hdma2ClockCnt = hdmaLen;
                 }
             }
@@ -367,16 +391,35 @@ void Memory::emulate_dma_cycle() {
 
 bool Memory::is_hdma_ongoing() { return hdma2ClockCnt > 0; }
 
+void Memory::continue_hblank_dma() {
+    if (hdmaBytesLeft > 0) {
+        hdma2ClockCnt = 0x10;
+        if ((hdmaDest + hdmaBytesTransferred + 0x10) >> 16 ||
+            (hdmaSource + hdmaBytesTransferred + 0x10) >> 16) {
+            fatal("TODO hblank dma source/dest overflow\n");
+        }
+    }
+}
+
 void Memory::emulate_hdma_2clock() {
     if (is_hdma_ongoing()) {
-        u16 i = hdmaLen - hdma2ClockCnt;
-        if ((hdmaDest + i) >> 16 || (hdmaSource + i) >> 16) {
-            fatal("TODO hdma source/dest overflow");
-        }
-        write(hdmaDest + i, read(hdmaSource + i));
-        hdma2ClockCnt--;
-        if (hdma2ClockCnt == 0) {
+        if ((hdmaDest + hdmaBytesTransferred) >> 16 || (hdmaSource + hdmaBytesTransferred) >> 16) {
+            hdmaBytesLeft = 0;
+            hdmaBytesTransferred = 0;
             mem[IOReg::HDMA5_REG] = 0xFF;
+            fatal("TODO hdma source/dest overflow\n");
+        }
+        write(hdmaDest + hdmaBytesTransferred, read(hdmaSource + hdmaBytesTransferred));
+        hdma2ClockCnt--;
+        hdmaBytesLeft--;
+        hdmaBytesTransferred++;
+        if (hdma2ClockCnt == 0) {
+            mem[IOReg::HDMA5_REG] &= 0x80;
+            mem[IOReg::HDMA5_REG] |= ((hdmaBytesLeft >> 4) - 1) & (0x7F);
+            if (hdmaBytesLeft == 0) {
+                hdmaBytesTransferred = 0;
+                mem[IOReg::HDMA5_REG] |= 0x80;
+            }
         }
     }
 }

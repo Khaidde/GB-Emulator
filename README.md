@@ -1,6 +1,6 @@
 # GB-Emulator
 
-A Gameboy/Gameboy Color emulator aimed at accuracy. This project is meant to be a learning exercise in C++. There are a ton of other gameboy emulators such as Gambatte, BGB and SameBoy which have better UIs, debuggers, and accuracy. I am doing this as a fun side project.
+An accurate Gameboy/Gameboy Color emulator meant to be a learning exercise in writing emulators. There are a ton of other gameboy emulators such as Gambatte, BGB and SameBoy which have better UIs, debuggers, and accuracy.
 
 # TODO
 
@@ -8,9 +8,6 @@ A Gameboy/Gameboy Color emulator aimed at accuracy. This project is meant to be 
 -   WX=167,00
 -   MBC3
 -   Serial
--   HDMA
--   Infared sensor
--   Command-line parser
 
 # Build
 

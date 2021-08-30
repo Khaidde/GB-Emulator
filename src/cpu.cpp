@@ -84,6 +84,8 @@ void CPU::fetch_execute() {
     // PAUSE_EXEC(this, debugger, 0x217);
     // PAUSE_EXEC(this, debugger, 0x610);
     // PAUSE_EXEC(this, debugger, 0x4C42);
+    // PAUSE_EXEC(this, debugger, 0x42A8);
+    // PAUSE_EXEC(this, debugger, 0x3BA);
 #endif
 
     if (debugger->is_paused()) {
@@ -912,7 +914,7 @@ void CPU::rst(u16 addr) {
 }
 
 void CPU::freeze() {
-    printf("Invalid opcode, freezing...\n");
+    printf("Invalid opcode=%02x, freezing...\n", memory->read(PC - 1));
     debugger->pause_exec();
 }
 

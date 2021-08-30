@@ -284,6 +284,7 @@ void PPU::emulate_clock() {
                 if (line == 130) {
                     // printf("cc=%d-%d\n", lineClocks - 80, *scx);
                 }
+                memory->continue_hblank_dma();
                 clockCnt = 4;
             }
             break;

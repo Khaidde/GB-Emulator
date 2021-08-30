@@ -98,7 +98,7 @@ void GameBoy::set_debugger(Debugger& debugger) {
 void GameBoy::emulate_frame() {
     bool frameElapsed = true;
     while (memory.get_elapsed_cycles() < PPU::TOTAL_CLOCKS << memory.is_double_speed()) {
-        if (debugger->is_paused() && !debugger->can_step()) {
+        if (debugger->is_paused() && !debugger->can_step() && !memory.is_hdma_ongoing()) {
             frameElapsed = false;
             break;
         }

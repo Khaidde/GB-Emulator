@@ -41,6 +41,7 @@ public:
     bool is_speed_switching();
 
     bool is_hdma_ongoing();
+    void continue_hblank_dma();
 
     int get_elapsed_cycles();
     void reset_elapsed_cycles();
@@ -80,6 +81,8 @@ private:
 
     u16 hdmaSource;
     u16 hdmaDest;
+    u16 hdmaBytesLeft;
+    u16 hdmaBytesTransferred;
     u16 hdmaLen;
     u16 hdma2ClockCnt;
 
