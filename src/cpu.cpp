@@ -86,6 +86,7 @@ void CPU::fetch_execute() {
     // PAUSE_EXEC(this, debugger, 0x4C42);
     // PAUSE_EXEC(this, debugger, 0x42A8);
     // PAUSE_EXEC(this, debugger, 0x3BA);
+    // PAUSE_EXEC(this, debugger, 0x3833);
 #endif
 
     if (debugger->is_paused()) {

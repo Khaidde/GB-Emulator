@@ -3,9 +3,11 @@
 #include <fstream>
 #include <vector>
 
-GameBoy::GameBoy() : cpu(memory), input(memory), timer(memory), apu(memory), ppu(memory) {
+GameBoy::GameBoy()
+    : cpu(memory), input(memory), timer(memory), serial(memory), apu(memory), ppu(memory) {
     memory.set_input(input);
     memory.set_timer(timer);
+    memory.set_serial(serial);
     memory.set_apu(apu);
     memory.set_ppu(ppu);
 }
@@ -81,6 +83,7 @@ void GameBoy::load(const char* romPath) {
     memory.restart();
     input.restart();
     timer.restart();
+    serial.restart();
     ppu.restart();
     apu.restart();
 }
@@ -93,6 +96,7 @@ void GameBoy::set_debugger(Debugger& debugger) {
     memory.set_debugger(debugger);
     ppu.set_debugger(debugger);
     timer.set_debugger(debugger);
+    serial.set_debugger(debugger);
 }
 
 void GameBoy::emulate_frame() {

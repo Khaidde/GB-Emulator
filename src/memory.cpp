@@ -198,6 +198,12 @@ void Memory::write(u16 addr, u8 val) {
             break;
         case IOReg::SC_REG:
             mem[addr] = (val & (1 << 8)) | 0x7E | (val & 1);
+            if (is_CGB_mode() && (val & (1 << 1))) {
+                fatal("TODO serial clock speed unimplemented for CGB");
+            }
+            if (val & 0x81) {
+                serial->trigger_transfer();
+            }
             break;
         case IOReg::DIV_REG:
             timer->reset_div();
@@ -431,6 +437,7 @@ void Memory::reset_elapsed_cycles() { elapsedCycles -= PPU::TOTAL_CLOCKS << isDo
 void Memory::sleep_cycle() {
     emulate_dma_cycle();
     timer->emulate_cycle();
+    serial->emulate_cycle();
     for (int i = 0; i < 4 >> (is_CGB_mode() && isDoubleSpeed); i++) {
         apu->emulate_clock();
         ppu->emulate_clock();

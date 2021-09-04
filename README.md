@@ -7,7 +7,6 @@ An accurate Gameboy/Gameboy Color emulator meant to be a learning exercise in wr
 -   OAM bug
 -   WX=167,00
 -   MBC3
--   Serial
 
 # Build
 
@@ -113,6 +112,12 @@ Note: Build has only been tested on 64-bit Windows 10
 | stat_irq_blocking           |   x    |                 |
 | stat_lyc_onoff              |   x    |                 |
 | vblank_stat_intr-GS         |   x    |                 |
+
+### serial
+
+| Test                       | Passed | Note |
+| -------------------------- | :----: | ---- |
+| boot_sclk_align_dmgABCmgb  |   x    |      |
 
 ### timer
 

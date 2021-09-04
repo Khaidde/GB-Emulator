@@ -9,6 +9,7 @@
 #include "input.hpp"
 #include "memory.hpp"
 #include "ppu.hpp"
+#include "serial.hpp"
 #include "timer.hpp"
 
 class GameBoy {
@@ -33,6 +34,7 @@ private:
 
     Input input;
     Timer timer;
+    Serial serial;
     APU apu;
     PPU ppu;
     Memory memory;

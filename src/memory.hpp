@@ -8,10 +8,12 @@
 #include "general.hpp"
 #include "input.hpp"
 #include "ppu.hpp"
+#include "serial.hpp"
 #include "timer.hpp"
 
 class Debugger;
 class Timer;
+class Serial;
 class PPU;
 class APU;
 
@@ -22,6 +24,7 @@ public:
     void set_debugger(Debugger& debugger) { this->debugger = &debugger; }
     void set_input(Input& in) { this->input = &in; }
     void set_timer(Timer& time) { this->timer = &time; }
+    void set_serial(Serial& ser) { this->serial = &ser; }
     void set_apu(APU& a) { this->apu = &a; }
     void set_ppu(PPU& p) { this->ppu = &p; }
 
@@ -60,6 +63,7 @@ private:
 
     Input* input;
     Timer* timer;
+    Serial* serial;
     APU* apu;
     PPU* ppu;
 
