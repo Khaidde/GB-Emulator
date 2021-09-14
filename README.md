@@ -98,20 +98,20 @@ Note: Build has only been tested on 64-bit Windows 10
 
 ### ppu
 
-| Test                        | Passed | Note            |
-| --------------------------- | :----: | --------------- |
-| hblank_ly_scx_timing-GS     |   x    |                 |
-| intr_1_2_timing-GS          |   x    |                 |
-| intr_2_0_timing             |   x    |                 |
-| intr_2_mode0_timing         |   x    |                 |
-| intr_2_mode0_timing_sprites |        | test #00 failed |
-| intr_2_mode3_timing         |   x    |                 |
-| intr_2_oam_ok_timing        |   x    |                 |
-| lcdon_timing-GS             |   x    |                 |
-| lcdon_write_timing-GS       |   x    |                 |
-| stat_irq_blocking           |   x    |                 |
-| stat_lyc_onoff              |   x    |                 |
-| vblank_stat_intr-GS         |   x    |                 |
+| Test                        | Passed | Note |
+| --------------------------- | :----: | ---- |
+| hblank_ly_scx_timing-GS     |   x    |      |
+| intr_1_2_timing-GS          |   x    |      |
+| intr_2_0_timing             |   x    |      |
+| intr_2_mode0_timing         |   x    |      |
+| intr_2_mode0_timing_sprites |   x    |      |
+| intr_2_mode3_timing         |   x    |      |
+| intr_2_oam_ok_timing        |   x    |      |
+| lcdon_timing-GS             |   x    |      |
+| lcdon_write_timing-GS       |   x    |      |
+| stat_irq_blocking           |   x    |      |
+| stat_lyc_onoff              |   x    |      |
+| vblank_stat_intr-GS         |   x    |      |
 
 ### serial
 

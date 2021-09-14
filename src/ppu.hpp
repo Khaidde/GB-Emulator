@@ -36,6 +36,47 @@ struct Fetcher {
     static constexpr FetchState FETCH_STATES[] = {
         SLEEP, READ_TILE_ID, SLEEP, READ_TILE_0, SLEEP, READ_TILE_1, PUSH, PUSH,
     };
+    // TODO test if this theory is correct on actual hardware
+    // clang-format off
+    // The first time a sprite is rendered in the middle of a background fetch cycle (8 pixel
+    // groups) the fetcher attempts to fast forward at maximum 5 cycles until tile 1 is read.
+    // Immediately on the same cycle as tile 1 is read, sprite fetch begins (6 cycles).
+    // Every consequent sprite corresponding to the last background push (max 8 pixels) does not
+    // incur this penalty.
+    //
+    // Key: bi=read background tileID, b1=read background tile low byte, b2=read background tile high byte, pp=try push pixel
+    //      si=read sprite tileID, s1=read sprite tile low byte, s2=read sprite tile high byte
+    //
+    // background fetcher     : __ bi __ b1 __ b2                                                    __ bi __ b1 __ b2 pp pp __ bi ...
+    // sprite fetcher         :                __ si __ s1 __ s2       __ si __ s1 __ s2
+    // oam fifo        (size) :  0  0  0  0  0  0  0  0  0  0  8  7  6  6  6  6  6  6  8  7  6  5  4  3  2  1  0  0  0  0  0  0  0 ...
+    // background fifo (size) :  7  6  6  6  6 14 14 14 14 14 14 13 12 12 12 12 12 12 12 11 10  9  8  7  6  5  4  3  2  1  8  7  6 ...
+    // current pixel x        :  8  9  -  -  -  -  -  -  -  -  - 10 11  -  -  -  -  -  - 12 13 14 15 16 17 18 19 20 21 22 23 24 25 ...
+    //                                 ^                       ^        ^              ^
+    //                                 |---- sprite at x = 10 --|       |sprite(x = 12)|
+    //                                [(5 - (10 & 7)) + 6] cycles           6 cycles
+    //
+    // Pseudocode based off:
+    // https://www.reddit.com/r/EmuDev/comments/59pawp/gb_mode3_sprite_timing/
+    // Note: calculation doesn't account for scx
+    //
+    // int cyclesInLine(int[] visibleSpriteX) {
+    //     const TOTAL_LINE_PIXELS = 168;
+    //     int[] penaltyDealt = int[TOTAL_LINE_PIXELS / 8];  // all indices are 0
+    //     int cycles = 172;
+    //     for (int x in visibleSpriteX) {
+    //         int curPenalty = 5 - (x & 0x7);
+    //         if (penaltyDealt[x / 8] < curPenalty) {
+    //             penaltyDealt[x / 8] = curPenalty;  // Get maximum penalty for each 8 pixel group
+    //         }
+    //         cycles += 6;  // 6 cycles to fetch a sprite
+    //     }
+    //     cycles += sum(penaltyDealt);
+    //     return cycles;
+    // }
+    // Passes mooneye test: intr_2_mode0_timing_sprites.gb
+    // clang-format on
+    bool isSpritePenaltyDealt;
     Sprite* curSprite;
     u8 tileX;
 

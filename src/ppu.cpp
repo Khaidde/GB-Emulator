@@ -219,7 +219,7 @@ void PPU::emulate_clock() {
 
                 u8 botBound = line + 16;
                 u8 spriteHeight = get_lcdc_flag(LCDCFlag::SPRITE_SIZE) ? 16 : 8;
-                if (x > 0 && botBound - spriteHeight < y && y <= botBound) {
+                if (x >= 0 && botBound - spriteHeight < y && y <= botBound) {
                     u8 tileID = *(spritePtr + 2);
                     u8 flags = *(spritePtr + 3);
                     spriteList.add({i, y, x, tileID, flags});
@@ -228,6 +228,7 @@ void PPU::emulate_clock() {
             }
 
             fetcher.curFetchState = 0;
+            fetcher.isSpritePenaltyDealt = false;
             fetcher.curSprite = nullptr;
             fetcher.windowXEnable = false;
             fetcher.tileX = 0;
@@ -263,33 +264,25 @@ void PPU::emulate_clock() {
         case PPUState::LCD:
             handle_pixel_render();
 
-            if (fetcher.curSprite) {
-                sprite_fetch();
-            } else {
+            if (bgFifo.size < 8 || (fetcher.curSprite && bgFifo.size <= 8)) {
                 background_fetch();
+                fetcher.curFetchState = (fetcher.curFetchState + 1) & 0x7;
             }
-            fetcher.curFetchState = (fetcher.curFetchState + 1) & 0x7;
-
-            if (curPixelX == Constants::WIDTH - 1) {
-                handle_pixel_render();
-                if (fetcher.curSprite) {
-                    sprite_fetch();
-                } else {
-                    background_fetch();
-                }
+            if (fetcher.curSprite && bgFifo.size > 8) {
+                sprite_fetch();
+                fetcher.curFetchState = (fetcher.curFetchState + 1) & 0x7;
+            }
+            if (curPixelX == Constants::WIDTH) {
+                set_stat_mode(H_BLANK_MODE);
 
                 fetcher.windowXEnable = false;
+                memory->continue_hblank_dma();
 
                 curPPUState = PPUState::H_BLANK_4;
-                if (line == 130) {
-                    // printf("cc=%d-%d\n", lineClocks - 80, *scx);
-                }
-                memory->continue_hblank_dma();
-                clockCnt = 4;
+                clockCnt = 3;  // LCD lasts for one extra clock during hblank
             }
             break;
         case PPUState::H_BLANK_4:
-            set_stat_mode(H_BLANK_MODE);
             try_mode_intr(H_BLANK_MODE);
             internalStatEnable |= 1;
             try_trigger_stat();
@@ -460,8 +453,10 @@ void PPU::handle_pixel_render() {
 
             Sprite* sprite = &spriteList.data[i];
             if (sprite->x <= curPixelX + 8) {
-                fetcher.curFetchState = 0;
                 fetcher.curSprite = sprite;
+                if (bgFifo.size >= 8) {
+                    fetcher.curFetchState = 0;
+                }
                 spriteList.remove(i);
                 return;
             }
@@ -586,7 +581,7 @@ void PPU::background_fetch() {
                                  : tileMapVram)[tileByteAddr + 1];
         }
         case Fetcher::PUSH:
-            if (bgFifo.size == 0) {
+            if ((fetcher.curSprite && bgFifo.size <= 8) || bgFifo.size == 0) {
                 u8 palette;
                 if (memory->is_CGB_mode()) {
                     palette = fetcher.tileAttribs & 0x7;
@@ -612,6 +607,8 @@ void PPU::background_fetch() {
                 }
                 fetcher.tileX++;
                 fetcher.curFetchState = 7;
+            } else {
+                fetcher.curFetchState = 6;  // Keep trying to push until it suceeds
             }
             break;
         case Fetcher::SLEEP:
