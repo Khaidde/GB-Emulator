@@ -2,11 +2,25 @@
 
 An accurate Gameboy/Gameboy Color emulator meant to be a learning exercise in writing emulators. There are a ton of other gameboy emulators such as Gambatte, BGB and SameBoy which have better UIs, debuggers, and accuracy.
 
-# TODO
+# Controls
+wasd - direction keys
+k - A button
+j - B button
+n - start
+b - select
 
--   OAM bug
--   WX=167,00
--   MBC3
+# Features
+- Fully featured base Gameboy emulation that passes all mooneye-gb hardware tests
+- Support for Gameboy Color features such as color, VRAM and WRAM banking, double speed mode, and HDMA
+- Pixel FIFO based graphics processing unit allowing for cycle accurate graphics emulation
+- Four channel audio processing unit with left and right panning
+- Cycle accurate timer, serial and dma implementation
+- Support for MBC1, MBC2, MBC3 and MBC5 cartridges
+- Implementation of "real time clock (RTC)" hardware on MBC3
+
+# Unimplemented
+- OAM bug
+- WX=167,00
 
 # Build
 
@@ -54,19 +68,7 @@ Note: Build has only been tested on 64-bit Windows 10
 
 # ROM Tests
 
-## Blargg tests
-
-| Test         | Passed | Note            |
-| ------------ | :----: | --------------- |
-| cpu_instrs   |   x    |                 |
-| dmg_sound    |        |                 |
-| instr_timing |   x    |                 |
-| mem_timing   |   x    |                 |
-| mem_timing_2 |   x    |                 |
-| oam_bug      |        | oam bug ignored |
-| halt_bug     |   x    |                 |
-
-## mooneye-gb tests
+## mooneye-gb tests (All passed)
 
 ### bits
 
@@ -222,3 +224,15 @@ Note: Build has only been tested on 64-bit Windows 10
 | Test            | Passed | Note |
 | --------------- | :----: | ---- |
 | sprite_priority |   x    |      |
+
+## Blargg tests
+
+| Test         | Passed | Note            |
+| ------------ | :----: | --------------- |
+| cpu_instrs   |   x    |                 |
+| dmg_sound    |        |                 |
+| instr_timing |   x    |                 |
+| mem_timing   |   x    |                 |
+| mem_timing_2 |   x    |                 |
+| oam_bug      |        | oam bug ignored |
+| halt_bug     |   x    |                 |

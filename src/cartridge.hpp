@@ -9,7 +9,7 @@ struct CartridgeInfo {
 
     bool hasRam = false;
     bool hasBattery = false;
-    bool hasTimer = false;   // TODO unimplemented
+    bool hasTimer = false;
     bool hasRumble = false;  // TODO unimplemented
 };
 
@@ -24,6 +24,8 @@ public:
 
     u8 read_rom(u16 addr);
     virtual u8 read_ram(u16 addr);
+
+    virtual void emulate_cycle();
 
     bool is_CGB() { return info.isCGB; }
     bool is_CGB_mode() { return info.isCGB && info.cgbMode; }
@@ -77,6 +79,42 @@ public:
     MBC2(CartridgeInfo& info, u8* rom);
     void write(u16 addr, u8 val) override;
     u8 read_ram(u16 addr) override;
+};
+
+class MBC3 : public Cartridge {
+public:
+    MBC3(CartridgeInfo& info, u8* rom);
+    void write(u16 addr, u8 val) override;
+    u8 read_ram(u16 addr) override;
+
+    void emulate_cycle() override;
+
+private:
+    bool isTimerEnabled;
+
+    // TODO only works on little-endian machines
+    union Time {
+        struct {
+            u8 seconds;
+            u8 minutes;
+            u8 hours;
+            u8 dayLo;
+            u8 dayHi;
+        };
+        u8 regs[5];
+    };
+    static constexpr Time timeBitmasks = {0x3F, 0x3F, 0x1F, 0xFF, 0xC1};
+
+    bool isRTCSelected = false;
+    bool isLatchHigh = false;
+    u8 curRTCRegNum = 0;
+    Time latchedTime;
+
+    static constexpr u32 CYCLES_PER_SECOND = 4194304 / 4;  // 4194304 clocks per second
+    u32 cycles;
+    Time realTime;
+
+    bool rtcOn = false;
 };
 
 class MBC5 : public Cartridge {

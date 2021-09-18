@@ -13,23 +13,33 @@ GameBoy::GameBoy()
 }
 
 namespace {
-constexpr int NUM_CART_TYPES = 9;
+constexpr int NUM_CART_TYPES = 14;
 // clang-format off
 constexpr struct {
     const u8 code;
     char mbc;
     bool hasRam;
     bool hasBattery;
+    bool hasTimer;
 } CART_TYPES[NUM_CART_TYPES] = {
-    {0x00, 0, false, false},
-    {0x01, 1, false, false},
-    {0x02, 1, true, false},
-    {0x03, 1, true, true},
-    {0x05, 2, false, false},
-    {0x06, 2, false, true},
-    {0x19, 5, false, false},
-    {0x1A, 5, true, false},
-    {0x1B, 5, true, true},
+    {0x00, 0, false, false, false},
+
+    {0x01, 1, false, false, false},
+    {0x02, 1, true, false, false},
+    {0x03, 1, true, true, false},
+
+    {0x05, 2, false, false, false},
+    {0x06, 2, false, true, false},
+
+    {0x0F, 3, false, true, true},
+    {0x10, 3, true, true, true},
+    {0x11, 3, false, false, false},
+    {0x12, 3, true, false, false},
+    {0x13, 3, true, true, false},
+
+    {0x19, 5, false, false, false},
+    {0x1A, 5, true, false, false},
+    {0x1B, 5, true, true, false},
 };
 //clang-format on
 }  // namespace
@@ -64,6 +74,9 @@ void GameBoy::load(const char* romPath) {
                     break;
                 case 2:
                     cartridge = std::make_unique<MBC2>(info, &rom[0]);
+                    break;
+                case 3:
+                    cartridge = std::make_unique<MBC3>(info, &rom[0]);
                     break;
                 case 5:
                     cartridge = std::make_unique<MBC5>(info, &rom[0]);

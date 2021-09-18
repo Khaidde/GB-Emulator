@@ -191,9 +191,6 @@ void Memory::write(u16 addr, u8 val) {
             mem[addr] = 0xC0 | (val & 0x30) | (mem[addr] & 0x0F);
             break;
         case IOReg::SB_REG:
-#if DEBUG && LOG
-            printf("%c", val);
-#endif
             mem[addr] = val;
             break;
         case IOReg::SC_REG:
@@ -201,7 +198,7 @@ void Memory::write(u16 addr, u8 val) {
             if (is_CGB_mode() && (val & (1 << 1))) {
                 fatal("TODO serial clock speed unimplemented for CGB");
             }
-            if (val & 0x81) {
+            if ((val & 0x81) == 0x81) {
                 serial->trigger_transfer();
             }
             break;
@@ -435,6 +432,7 @@ int Memory::get_elapsed_cycles() { return elapsedCycles; }
 void Memory::reset_elapsed_cycles() { elapsedCycles -= PPU::TOTAL_CLOCKS << isDoubleSpeed; }
 
 void Memory::sleep_cycle() {
+    cartridge->emulate_cycle();
     emulate_dma_cycle();
     timer->emulate_cycle();
     serial->emulate_cycle();

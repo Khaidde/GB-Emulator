@@ -199,6 +199,8 @@ u8 Cartridge::read_ram(u16 addr) {
     return 0xFF;
 }
 
+void Cartridge::emulate_cycle() {}
+
 ROMOnly::ROMOnly(CartridgeInfo& info, u8* rom) : Cartridge(info, "ROM Only", 2, 0, rom) {}
 
 void ROMOnly::write(u16 addr, u8 val) {
@@ -292,6 +294,115 @@ u8 MBC2::read_ram(u16 addr) {
         return ramBanks[0][(addr - EXTERNAL_RAM_ADDR) & 0x1FF];
     }
     return 0xFF;
+}
+
+MBC3::MBC3(CartridgeInfo& info, u8* rom) : Cartridge(info, "MBC3", 256, 4, rom) {
+    for (int i = 0; i < 5; i++) {
+        // TODO keep track of the real time value in the save file
+        realTime.regs[i] = 0;
+        latchedTime.regs[i] = 0xFF;
+    }
+}
+
+void MBC3::write(u16 addr, u8 val) {
+    if (addr < 0x2000) {
+        if ((val & 0xF) == 0xA) {
+            ramg = info.hasRam;
+            isTimerEnabled = info.hasTimer || info.hasBattery;
+        }
+    } else if (addr < 0x4000) {
+        if ((val & 0x7F) == 0) {
+            highBank = &romBanks[1];
+        } else {
+            highBank = &romBanks[val & 0x7F];
+        }
+    } else if (addr < 0x6000) {
+        isRTCSelected = false;
+        if (val <= 0x3) {
+            if (numRamBanks > 0) {
+                activeRamBank = &ramBanks[val & 0x3];
+            }
+        } else if (isTimerEnabled && 0x8 <= val && val <= 0xC) {
+            isRTCSelected = true;
+            curRTCRegNum = val - 0x8;
+        }
+    } else if (addr < 0x8000) {
+        if (val == 0x1) {
+            if (!isLatchHigh) {
+                latchedTime = realTime;
+            }
+            isLatchHigh = true;
+        } else if (val == 0) {
+            isLatchHigh = false;
+        }
+    } else if (EXTERNAL_RAM_ADDR <= addr || addr < EXTERNAL_RAM_ADDR + RAM_BANK_SIZE) {
+        if (isTimerEnabled && isRTCSelected) {
+            realTime.regs[curRTCRegNum] = val & timeBitmasks.regs[curRTCRegNum];
+
+            // Write to RTC S register reset sub-second cycle count
+            if (curRTCRegNum == 0) {
+                cycles = 0;
+            }
+
+            // Bit 6 of the RTC DH register can be set to halt the timer
+            if (curRTCRegNum == 4) {
+                rtcOn = (val & (1 << 6)) == 0;
+            }
+        } else if (ramg) {
+            (*activeRamBank)[addr - EXTERNAL_RAM_ADDR] = val;
+        }
+    } else {
+        fatal("Invalid MBC3 address write: %02x\n", addr);
+    }
+}
+
+u8 MBC3::read_ram(u16 addr) {
+    if (EXTERNAL_RAM_ADDR > addr || addr >= EXTERNAL_RAM_ADDR + RAM_BANK_SIZE) {
+        fatal("Invalid ram address read: %04x\n", addr);
+    }
+    if (isTimerEnabled && isRTCSelected) {
+        return latchedTime.regs[curRTCRegNum];
+    } else if (ramg) {
+        return (*activeRamBank)[addr - EXTERNAL_RAM_ADDR];
+    }
+    return 0xFF;
+}
+
+void MBC3::emulate_cycle() {
+    if (rtcOn) {
+        cycles++;
+        if (cycles >= CYCLES_PER_SECOND) {
+            cycles -= CYCLES_PER_SECOND;
+
+            realTime.seconds = (realTime.seconds + 1) & timeBitmasks.seconds;
+            if (realTime.seconds != 60) {
+                return;
+            }
+
+            realTime.seconds = 0;
+            realTime.minutes = (realTime.minutes + 1) & timeBitmasks.minutes;
+            if (realTime.minutes != 60) {
+                return;
+            }
+
+            realTime.minutes = 0;
+            realTime.hours = (realTime.hours + 1) & timeBitmasks.hours;
+            if (realTime.hours != 24) {
+                return;
+            }
+
+            realTime.hours = 0;
+            realTime.dayLo++;
+            if (realTime.dayLo != 0) {
+                return;
+            }
+
+            if (realTime.dayHi & 0x1) {
+                realTime.dayHi |= 0x80;
+            }
+            realTime.dayHi ^= 0x1;
+        }
+    }
 }
 
 MBC5::MBC5(CartridgeInfo& info, u8* rom) : Cartridge(info, "MBC5", 512, 16, rom) {}
