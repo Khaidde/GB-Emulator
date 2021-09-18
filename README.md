@@ -1,22 +1,45 @@
 # GB-Emulator
 
-An accurate Gameboy/Gameboy Color emulator meant to be a learning exercise in writing emulators. There are a ton of other gameboy emulators such as Gambatte, BGB and SameBoy which have better UIs, debuggers, and accuracy.
+A Gameboy/Gameboy Color emulator meant to be a learning exercise in writing emulators.
 
 # Controls
-wasd - direction keys
-k - A button
-j - B button
-n - start
-b - select
+- wasd - direction keys
+- k - A button
+- j - B button
+- n - start
+- b - select
 
 # Features
-- Fully featured base Gameboy emulation that passes all mooneye-gb hardware tests
-- Support for Gameboy Color features such as color, VRAM and WRAM banking, double speed mode, and HDMA
+- Fully featured base Gameboy emulation that passes all mooneye-gb hardware tests ([See below](#rom-tests))
+- Support for Gameboy Color features such as color, VRAM and WRAM banking, double speed mode, and partial HDMA support
+- Emulation of saturated gameboy color screen
 - Pixel FIFO based graphics processing unit allowing for cycle accurate graphics emulation
 - Four channel audio processing unit with left and right panning
 - Cycle accurate timer, serial and dma implementation
 - Support for MBC1, MBC2, MBC3 and MBC5 cartridges
 - Implementation of "real time clock (RTC)" hardware on MBC3
+
+# Images
+
+## Gameboy
+![BattleToads](/images/battletoads.png)
+![Bomberman](/images/bomberman.png)
+![FinalFantasyLengend3](/images/finalfantasylegend3.png)
+![HarvestMoon](/images/harvestmoon.png)
+![KirbysPinballLand](/images/kirbyspinballland.png)
+![MegamanV](/images/megamanV.png)
+![PokemonBlue](/images/pokemonblue.png)
+![PuyoPuyoTsuu](/images/puyopuyo2.png)
+
+## Gameboy Color
+![LegendOfZeldaLinksAwakening](/images/awakeningloz.png)
+![DanceDanceRevolution3](/images/ddr3.png)
+![DragonWarrior3](/images/dragonwarrior3.png)
+![MagicTetris](/images/magictetris.png)
+![PokemonGold](/images/pokemongold.png)
+![Raymond](/images/raymond.png)
+![StreetFighter](/images/streetfighter.png)
+![WarioLand3](/images/warioland3.png)
 
 # Unimplemented
 - OAM bug

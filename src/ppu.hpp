@@ -253,10 +253,11 @@ private:
     bool vramBlockWrite;
 
     // ICE_CREAM_GB const u32 baseColors[4] = {0xFFFFF6D3, 0xFFF9A875, 0xFFEB6B6F, 0xFF7C3F58};
-    // COLD_FIRE_GB const u32 baseColors[4] = {0xFFF6C6A8, 0xFFD17C7C, 0xFF5B768D, 0xFF46425E};
+    // COLD_FIRE_GB
+    const u32 baseColors[4] = {0xFFF6C6A8, 0xFFD17C7C, 0xFF5B768D, 0xFF46425E};
     // SEA_SALT_ICE_CREAM const u32 baseColors[4] = {0xFFFFF6D3, 0xFF8BE6FF, 0xFF608ECF,
     // 0xFF3336E8}; MIST_GB
-    const u32 baseColors[4] = {0xFFC4F0C2, 0xFF5AB9A8, 0xFF1E606E, 0xFF2D1B00};
+    // const u32 baseColors[4] = {0xFFC4F0C2, 0xFF5AB9A8, 0xFF1E606E, 0xFF2D1B00};
     // CANDYPOP const u32 baseColors[4] = {0xFFEEBFF5, 0xFF9E81D0, 0xFF854576, 0xFF301221};
     // CAVE4 const u32 baseColors[4] = {0xFFE4CBBF, 0xFF938282, 0xFF4F4E80, 0xFF2C0016};
     const u32 BLANK_COLOR = 0xFF101010;
