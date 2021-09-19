@@ -1,6 +1,6 @@
 # GB-Emulator
 
-A Gameboy/Gameboy Color emulator meant to be a learning exercise in writing emulators.
+A Gameboy/Gameboy Color emulator written to learn about emulator programming.
 
 # Controls
 - wasd - direction keys
@@ -22,24 +22,14 @@ A Gameboy/Gameboy Color emulator meant to be a learning exercise in writing emul
 # Images
 
 ## Gameboy
-![BattleToads](/images/battletoads.png)
-![Bomberman](/images/bomberman.png)
-![FinalFantasyLengend3](/images/finalfantasylegend3.png)
-![HarvestMoon](/images/harvestmoon.png)
-![KirbysPinballLand](/images/kirbyspinballland.png)
-![MegamanV](/images/megamanV.png)
-![PokemonBlue](/images/pokemonblue.png)
-![PuyoPuyoTsuu](/images/puyopuyo2.png)
+<img src=/images/battletoads.png width=300><img src=/images/bomberman.png width=300><img src=/images/finalfantasylegend3.png width=300>
+<img src=/images/harvestmoon.png width=300><img src=/images/kirbyspinballland.png width=300><img src=/images/megamanV.png width=300>
+<img src=/images/pokemonblue.png width=300><img src=/images/puyopuyo2.png width=300>
 
 ## Gameboy Color
-![LegendOfZeldaLinksAwakening](/images/awakeningloz.png)
-![DanceDanceRevolution3](/images/ddr3.png)
-![DragonWarrior3](/images/dragonwarrior3.png)
-![MagicTetris](/images/magictetris.png)
-![PokemonGold](/images/pokemongold.png)
-![Raymond](/images/raymond.png)
-![StreetFighter](/images/streetfighter.png)
-![WarioLand3](/images/warioland3.png)
+<img src=/images/awakeningloz.png width=300><img src=/images/ddr3.png width=300><img src=/images/dragonwarrior3.png width=300>
+<img src=/images/magictetris.png width=300><img src=/images/pokemongold.png width=300><img src=/images/raymond.png width=300>
+<img src=/images/streetfighter.png width=300><img src=/images/warioland3.png width=300>
 
 # Unimplemented
 - OAM bug
